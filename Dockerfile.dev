@@ -1,0 +1,22 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Instalar pnpm
+RUN npm install -g pnpm
+
+# Copiar archivos de dependencias
+COPY package*.json ./
+COPY pnpm-lock.yaml ./
+
+# Instalar todas las dependencias (incluidas devDependencies)
+RUN pnpm install --frozen-lockfile
+
+# Copiar código fuente (esto se sobrescribirá con el volumen)
+COPY . .
+
+# Exponer puerto
+EXPOSE 3000
+
+# Comando de inicio en modo watch
+CMD ["pnpm", "run", "start:dev"]

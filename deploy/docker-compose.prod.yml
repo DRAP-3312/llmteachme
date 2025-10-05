@@ -1,9 +1,9 @@
 services:
   llmteachme-api:
-    image: llmteachme-api:latest
+    image: llmteachme-api:IMAGE_TAG_PLACEHOLDER
     environment:
       NODE_ENV: production
-      PORT: PORT_PLACEHOLDER
+      PORT: 3000
       MONGODB_URI: MONGO_URL_PLACEHOLDER
       JWT_SECRET: JWT_SECRET_PLACEHOLDER
       JWT_EXPIRES_IN: 15m
@@ -20,7 +20,7 @@ services:
     deploy:
       labels:
         caddy: llmteachme.saguarodrap.dev
-        caddy.reverse_proxy: "{{upstreams PORT_PLACEHOLDER}}"
+        caddy.reverse_proxy: "{{upstreams 3000}}"
       replicas: 1
       restart_policy:
         condition: any
@@ -40,7 +40,7 @@ services:
         failure_action: rollback
         order: start-first
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:PORT_PLACEHOLDER/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
       interval: 30s
       timeout: 10s
       retries: 3
