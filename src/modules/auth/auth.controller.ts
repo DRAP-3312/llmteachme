@@ -5,6 +5,10 @@ import {
   Get,
   UseGuards,
   HttpCode,
+  Req,
+  Ip,
+  Patch,
+  Delete,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -13,9 +17,11 @@ import {
   ApiBearerAuth,
   ApiBody,
 } from '@nestjs/swagger';
+import type { Request } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
+import { ChangePasswordDto } from './dto/change-password.dto';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { CurrentUser } from './decorators/current-user.decorator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -61,8 +67,13 @@ export class AuthController {
     status: 401,
     description: 'Invalid credentials or user account disabled',
   })
-  async login(@Body() dto: LoginDto) {
-    return this.authService.login(dto);
+  async login(
+    @Body() dto: LoginDto,
+    @Req() req: Request,
+    @Ip() ipAddress: string,
+  ) {
+    const userAgent = req.headers['user-agent'];
+    return this.authService.login(dto, userAgent, ipAddress);
   }
 
   @Public()
@@ -86,8 +97,13 @@ export class AuthController {
     description: 'Token refreshed successfully. Returns new access token.',
   })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
-  async refreshToken(@Body('refreshToken') refreshToken: string) {
-    return this.authService.refreshToken(refreshToken);
+  async refreshToken(
+    @Body('refreshToken') refreshToken: string,
+    @Req() req: Request,
+    @Ip() ipAddress: string,
+  ) {
+    const userAgent = req.headers['user-agent'];
+    return this.authService.refreshToken(refreshToken, userAgent, ipAddress);
   }
 
   @UseGuards(JwtAuthGuard)
@@ -114,12 +130,53 @@ export class AuthController {
   @ApiBearerAuth('JWT-auth')
   @ApiOperation({
     summary: 'Logout user',
-    description: "Invalidate the user's refresh token",
+    description: "Invalidate all user's refresh tokens",
   })
   @ApiResponse({ status: 201, description: 'Logged out successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  logout(@CurrentUser('userId') userId: string) {
-    this.authService.logout(userId);
+  async logout(@CurrentUser('userId') userId: string) {
+    await this.authService.logout(userId);
     return { message: 'Logged out successfully' };
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Patch('change-password')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Change password',
+    description:
+      'Change user password. All active sessions will be invalidated.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Password changed successfully',
+  })
+  @ApiResponse({ status: 400, description: 'Validation error' })
+  @ApiResponse({ status: 401, description: 'Unauthorized or wrong password' })
+  async changePassword(
+    @CurrentUser('userId') userId: string,
+    @Body() dto: ChangePasswordDto,
+  ) {
+    return this.authService.changePassword(
+      userId,
+      dto.currentPassword,
+      dto.newPassword,
+    );
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Delete('sessions/all')
+  @ApiBearerAuth('JWT-auth')
+  @ApiOperation({
+    summary: 'Revoke all sessions',
+    description: 'Logout from all devices by invalidating all refresh tokens',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'All sessions revoked successfully',
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  async revokeAllSessions(@CurrentUser('userId') userId: string) {
+    return this.authService.revokeAllSessions(userId);
   }
 }
