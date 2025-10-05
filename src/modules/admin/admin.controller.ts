@@ -11,9 +11,13 @@ import {
 } from '@nestjs/common';
 import { AdminService } from './admin.service';
 import { CreatePromptTemplateDto } from '../prompt/dto/create-prompt-template.dto';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
+import { Roles } from '../auth/decorators/roles.decorator';
 
 @Controller('admin')
-// @UseGuards(ApiKeyGuard) // TODO: Uncomment when authentication is needed
+@UseGuards(JwtAuthGuard, RolesGuard)
+@Roles('admin')
 export class AdminController {
   constructor(private readonly adminService: AdminService) {}
 

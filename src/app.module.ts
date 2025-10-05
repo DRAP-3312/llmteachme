@@ -4,6 +4,7 @@ import { MongooseModule } from '@nestjs/mongoose';
 import { ConversationModule } from './modules/conversation/conversation.module';
 import { GeminiModule } from './modules/gemini/gemini.module';
 import { PromptModule } from './modules/prompt/prompt.module';
+import { AuthModule } from './modules/auth/auth.module';
 
 @Module({
   imports: [
@@ -25,6 +26,8 @@ import { PromptModule } from './modules/prompt/prompt.module';
     GeminiModule,
 
     PromptModule,
+
+    AuthModule,
   ],
   controllers: [],
   providers: [],
