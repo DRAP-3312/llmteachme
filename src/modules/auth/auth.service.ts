@@ -81,7 +81,7 @@ export class AuthService {
     this.logger.log(`User logged in: ${user.name}`);
 
     // Generate tokens
-    const tokens = await this.generateTokens(user);
+    const tokens = this.generateTokens(user);
 
     return {
       accessToken: tokens.accessToken,
@@ -128,9 +128,10 @@ export class AuthService {
   /**
    * Generate access and refresh tokens
    */
-  private async generateTokens(
-    user: UserDocument,
-  ): Promise<{ accessToken: string; refreshToken: string }> {
+  private generateTokens(user: UserDocument): {
+    accessToken: string;
+    refreshToken: string;
+  } {
     const payload = {
       sub: (user._id as any).toString(),
       userId: (user._id as any).toString(),
@@ -141,7 +142,7 @@ export class AuthService {
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
-    // TODO: Store refresh token in RefreshToken schema
+    // TODO: Store refresh token in RefreshToken schema (will be async)
 
     return { accessToken, refreshToken };
   }
@@ -158,8 +159,8 @@ export class AuthService {
   /**
    * Logout user (invalidate refresh token)
    */
-  async logout(userId: string): Promise<void> {
-    // TODO: Delete refresh token from RefreshToken schema
+  logout(userId: string): void {
+    // TODO: Delete refresh token from RefreshToken schema (will be async)
     this.logger.log(`User logged out: ${userId}`);
   }
 

@@ -5,6 +5,7 @@ import { ConversationModule } from './modules/conversation/conversation.module';
 import { GeminiModule } from './modules/gemini/gemini.module';
 import { PromptModule } from './modules/prompt/prompt.module';
 import { AuthModule } from './modules/auth/auth.module';
+import { UserModule } from './modules/user/user.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { HealthModule } from './health/health.module';
 
@@ -30,6 +31,8 @@ import { HealthModule } from './health/health.module';
     PromptModule,
 
     AuthModule,
+
+    UserModule,
 
     AdminModule,
 

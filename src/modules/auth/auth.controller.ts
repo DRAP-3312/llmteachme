@@ -118,8 +118,8 @@ export class AuthController {
   })
   @ApiResponse({ status: 201, description: 'Logged out successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  async logout(@CurrentUser('userId') userId: string) {
-    await this.authService.logout(userId);
+  logout(@CurrentUser('userId') userId: string) {
+    this.authService.logout(userId);
     return { message: 'Logged out successfully' };
   }
 }
