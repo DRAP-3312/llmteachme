@@ -80,7 +80,6 @@ jobs:
 
         # Transfer configuration files
         scp -i ~/.ssh/deploy_key /tmp/docker-compose.llmteachme.yml ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/docker-compose.llmteachme.yml
-        scp -i ~/.ssh/deploy_key init-mongo.js ${{ secrets.SERVER_USER }}@${{ secrets.SERVER_HOST }}:~/init-mongo.js
 
     - name: Deploy to server
       run: |
