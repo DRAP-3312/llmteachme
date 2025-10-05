@@ -8,10 +8,12 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, UseGuards, UsePipes, ValidationPipe } from '@nestjs/common';
+import { Logger, UsePipes, ValidationPipe } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { ConversationService } from '../conversation.service';
 import { SendMessageDto } from '../dto/send-message.dto';
 
+@ApiTags('websocket')
 @WebSocketGateway({
   cors: {
     origin: '*',
@@ -49,10 +51,12 @@ export class ConversationGateway implements OnGatewayConnection, OnGatewayDiscon
     }
   }
 
-  /**
-   * Register user to socket mapping
-   */
   @SubscribeMessage('register')
+  @ApiOperation({
+    summary: 'Register user to WebSocket',
+    description: 'Maps userId to socketId for real-time messaging. Client receives "registered" event on success.'
+  })
+  @ApiResponse({ status: 200, description: 'User registered successfully, emits "registered" event' })
   handleRegister(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { userId: string },
@@ -66,10 +70,13 @@ export class ConversationGateway implements OnGatewayConnection, OnGatewayDiscon
     });
   }
 
-  /**
-   * Handle incoming user messages
-   */
   @SubscribeMessage('sendMessage')
+  @ApiOperation({
+    summary: 'Send chat message',
+    description: 'Process user message through AI tutor. Returns analysis and AI response. Emits: assistantTyping, messageReceived, messageResponse, error'
+  })
+  @ApiResponse({ status: 200, description: 'Message processed, emits messageReceived and messageResponse events' })
+  @ApiResponse({ status: 400, description: 'Validation error or prompt injection detected, emits error event' })
   @UsePipes(new ValidationPipe({ transform: true }))
   async handleSendMessage(
     @ConnectedSocket() client: Socket,
@@ -115,10 +122,12 @@ export class ConversationGateway implements OnGatewayConnection, OnGatewayDiscon
     }
   }
 
-  /**
-   * Handle user typing indicator
-   */
   @SubscribeMessage('typing')
+  @ApiOperation({
+    summary: 'Typing indicator',
+    description: 'Broadcast typing status to other users. Emits "userTyping" event to other clients.'
+  })
+  @ApiResponse({ status: 200, description: 'Typing indicator broadcasted' })
   handleTyping(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { userId: string; isTyping: boolean },
@@ -130,10 +139,13 @@ export class ConversationGateway implements OnGatewayConnection, OnGatewayDiscon
     });
   }
 
-  /**
-   * Get conversation history
-   */
   @SubscribeMessage('getConversation')
+  @ApiOperation({
+    summary: 'Get conversation history',
+    description: 'Retrieve conversation details and all messages by conversationId. Emits "conversationData" event.'
+  })
+  @ApiResponse({ status: 200, description: 'Conversation retrieved, emits conversationData event' })
+  @ApiResponse({ status: 404, description: 'Conversation not found, emits error event' })
   async handleGetConversation(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string },
@@ -159,10 +171,12 @@ export class ConversationGateway implements OnGatewayConnection, OnGatewayDiscon
     }
   }
 
-  /**
-   * Get user's active conversation
-   */
   @SubscribeMessage('getActiveConversation')
+  @ApiOperation({
+    summary: 'Get active conversation',
+    description: 'Retrieve the current active conversation for a user. Emits "activeConversation" event with conversation and messages or null.'
+  })
+  @ApiResponse({ status: 200, description: 'Active conversation retrieved, emits activeConversation event' })
   async handleGetActiveConversation(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { userId: string },
@@ -196,10 +210,13 @@ export class ConversationGateway implements OnGatewayConnection, OnGatewayDiscon
     }
   }
 
-  /**
-   * End current conversation
-   */
   @SubscribeMessage('endConversation')
+  @ApiOperation({
+    summary: 'End conversation',
+    description: 'Mark conversation as inactive (isActive=false). Emits "conversationEnded" event with updated conversation.'
+  })
+  @ApiResponse({ status: 200, description: 'Conversation ended, emits conversationEnded event' })
+  @ApiResponse({ status: 404, description: 'Conversation not found, emits error event' })
   async handleEndConversation(
     @ConnectedSocket() client: Socket,
     @MessageBody() data: { conversationId: string },
