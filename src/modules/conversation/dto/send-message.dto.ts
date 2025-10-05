@@ -4,7 +4,7 @@ import { ApiProperty } from '@nestjs/swagger';
 export class SendMessageDto {
   @ApiProperty({
     description: 'Message content (text or audio data)',
-    example: 'Hello, I want to practice my English conversation skills'
+    example: 'Hello, I want to practice my English conversation skills',
   })
   @IsString()
   content: string;
@@ -14,7 +14,7 @@ export class SendMessageDto {
     enum: ['text', 'audio'],
     example: 'text',
     required: false,
-    default: 'text'
+    default: 'text',
   })
   @IsEnum(['text', 'audio'])
   @IsOptional()
@@ -23,7 +23,7 @@ export class SendMessageDto {
   @ApiProperty({
     description: 'Existing conversation ID (omit to create new conversation)',
     example: '507f1f77bcf86cd799439011',
-    required: false
+    required: false,
   })
   @IsString()
   @IsOptional()

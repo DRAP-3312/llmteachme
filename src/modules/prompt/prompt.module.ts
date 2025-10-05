@@ -1,7 +1,10 @@
 import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { PromptService } from './prompt.service';
-import { PromptTemplate, PromptTemplateSchema } from './schemas/prompt-template.schema';
+import {
+  PromptTemplate,
+  PromptTemplateSchema,
+} from './schemas/prompt-template.schema';
 
 @Module({
   imports: [

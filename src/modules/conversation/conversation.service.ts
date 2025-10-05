@@ -1,7 +1,10 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
-import { Conversation, ConversationDocument } from './schemas/conversation.schema';
+import {
+  Conversation,
+  ConversationDocument,
+} from './schemas/conversation.schema';
 import { Message, MessageDocument } from './schemas/message.schema';
 import { GeminiService } from '../gemini/gemini.service';
 import { PromptService } from '../prompt/prompt.service';
@@ -9,7 +12,10 @@ import { CreateConversationDto } from './dto/create-conversation.dto';
 import { CreateMessageDto } from './dto/create-message.dto';
 import { SendMessageDto } from './dto/send-message.dto';
 import { GeminiMessage } from '../../common/interfaces/gemini.interface';
-import { ConversationContext, ConversationMetadata } from '../../common/interfaces/conversation.interface';
+import {
+  ConversationContext,
+  ConversationMetadata,
+} from '../../common/interfaces/conversation.interface';
 
 @Injectable()
 export class ConversationService {
@@ -27,7 +33,9 @@ export class ConversationService {
   /**
    * Create a new conversation
    */
-  async createConversation(dto: CreateConversationDto): Promise<ConversationDocument> {
+  async createConversation(
+    dto: CreateConversationDto,
+  ): Promise<ConversationDocument> {
     const conversation = new this.conversationModel({
       userId: dto.userId,
       conversationType: dto.conversationType || 'general',
@@ -37,7 +45,9 @@ export class ConversationService {
     });
 
     await conversation.save();
-    this.logger.log(`Created conversation ${conversation._id} for user ${dto.userId}`);
+    this.logger.log(
+      `Created conversation ${String(conversation._id)} for user ${dto.userId}`,
+    );
 
     return conversation;
   }
@@ -71,7 +81,9 @@ export class ConversationService {
   /**
    * Get active conversation for a user
    */
-  async getActiveConversation(userId: string): Promise<ConversationDocument | null> {
+  async getActiveConversation(
+    userId: string,
+  ): Promise<ConversationDocument | null> {
     return this.conversationModel
       .findOne({ userId, isActive: true })
       .populate('messages')
@@ -81,7 +93,9 @@ export class ConversationService {
   /**
    * Get conversation messages
    */
-  async getConversationMessages(conversationId: string): Promise<MessageDocument[]> {
+  async getConversationMessages(
+    conversationId: string,
+  ): Promise<MessageDocument[]> {
     return this.messageModel
       .find({ conversationId })
       .sort({ createdAt: 1 })
@@ -94,7 +108,10 @@ export class ConversationService {
   async processMessage(
     userId: string,
     dto: SendMessageDto,
-  ): Promise<{ userMessage: MessageDocument; assistantMessage: MessageDocument }> {
+  ): Promise<{
+    userMessage: MessageDocument;
+    assistantMessage: MessageDocument;
+  }> {
     // 1. Get or create conversation
     let conversation: ConversationDocument;
 
@@ -117,7 +134,9 @@ export class ConversationService {
     const injectionCheck = this.promptService.checkPromptInjection(dto.content);
 
     if (!injectionCheck.isSafe) {
-      this.logger.warn(`Prompt injection detected from user ${userId}: ${injectionCheck.threats.join(', ')}`);
+      this.logger.warn(
+        `Prompt injection detected from user ${userId}: ${injectionCheck.threats.join(', ')}`,
+      );
       // Use sanitized input
       dto.content = injectionCheck.sanitizedInput || dto.content;
     }
@@ -191,7 +210,9 @@ export class ConversationService {
     };
     await assistantMessage.save();
 
-    this.logger.log(`Processed message for conversation ${conversation._id}`);
+    this.logger.log(
+      `Processed message for conversation ${String(conversation._id)}`,
+    );
 
     return { userMessage, assistantMessage };
   }
@@ -211,10 +232,9 @@ export class ConversationService {
     await message.save();
 
     // Update conversation's message array
-    await this.conversationModel.findByIdAndUpdate(
-      dto.conversationId,
-      { $push: { messages: message._id } },
-    );
+    await this.conversationModel.findByIdAndUpdate(dto.conversationId, {
+      $push: { messages: message._id },
+    });
 
     return message;
   }

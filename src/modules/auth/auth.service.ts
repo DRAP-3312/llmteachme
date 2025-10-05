@@ -25,7 +25,9 @@ export class AuthService {
   /**
    * Register a new user
    */
-  async register(dto: RegisterDto): Promise<{ accessToken: string; user: any }> {
+  async register(
+    dto: RegisterDto,
+  ): Promise<{ accessToken: string; user: any }> {
     // Check if user exists
     const existingUser = await this.userModel.findOne({ email: dto.email });
     if (existingUser) {
@@ -59,7 +61,9 @@ export class AuthService {
   /**
    * Login user
    */
-  async login(dto: LoginDto): Promise<{ accessToken: string; refreshToken: string; user: any }> {
+  async login(
+    dto: LoginDto,
+  ): Promise<{ accessToken: string; refreshToken: string; user: any }> {
     // Find user
     const user = await this.userModel.findOne({ email: dto.email });
     if (!user) {
@@ -130,7 +134,7 @@ export class AuthService {
       });
 
       return { accessToken };
-    } catch (error) {
+    } catch {
       throw new UnauthorizedException('Invalid refresh token');
     }
   }

@@ -1,9 +1,18 @@
 import { Injectable, NotFoundException, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { PromptTemplate, PromptTemplateDocument } from '../prompt/schemas/prompt-template.schema';
-import { Conversation, ConversationDocument } from '../conversation/schemas/conversation.schema';
-import { Message, MessageDocument } from '../conversation/schemas/message.schema';
+import {
+  PromptTemplate,
+  PromptTemplateDocument,
+} from '../prompt/schemas/prompt-template.schema';
+import {
+  Conversation,
+  ConversationDocument,
+} from '../conversation/schemas/conversation.schema';
+import {
+  Message,
+  MessageDocument,
+} from '../conversation/schemas/message.schema';
 import { PromptService } from '../prompt/prompt.service';
 import { ConversationService } from '../conversation/conversation.service';
 import { GeminiService } from '../gemini/gemini.service';
@@ -28,10 +37,15 @@ export class AdminService {
   // ==================== Prompt Templates CRUD ====================
 
   async getAllTemplates(): Promise<PromptTemplateDocument[]> {
-    return this.promptTemplateModel.find().sort({ layer: 1, priority: -1 }).exec();
+    return this.promptTemplateModel
+      .find()
+      .sort({ layer: 1, priority: -1 })
+      .exec();
   }
 
-  async getTemplatesByLayer(layer: 'system' | 'user' | 'context'): Promise<PromptTemplateDocument[]> {
+  async getTemplatesByLayer(
+    layer: 'system' | 'user' | 'context',
+  ): Promise<PromptTemplateDocument[]> {
     return this.promptService.getTemplatesByLayer(layer);
   }
 
@@ -43,7 +57,9 @@ export class AdminService {
     return template;
   }
 
-  async createTemplate(dto: CreatePromptTemplateDto): Promise<PromptTemplateDocument> {
+  async createTemplate(
+    dto: CreatePromptTemplateDto,
+  ): Promise<PromptTemplateDocument> {
     return this.promptService.createTemplate(dto);
   }
 
@@ -51,7 +67,10 @@ export class AdminService {
     name: string,
     updates: Partial<CreatePromptTemplateDto>,
   ): Promise<PromptTemplateDocument> {
-    const result = await this.promptService.updateTemplate(name, updates as any);
+    const result = await this.promptService.updateTemplate(
+      name,
+      updates as any,
+    );
     if (!result) {
       throw new NotFoundException(`Template '${name}' not found`);
     }
@@ -92,8 +111,12 @@ export class AdminService {
     }
 
     const total = await this.conversationModel.countDocuments(query).exec();
-    const active = await this.conversationModel.countDocuments({ ...query, isActive: true }).exec();
-    const ended = await this.conversationModel.countDocuments({ ...query, isActive: false }).exec();
+    const active = await this.conversationModel
+      .countDocuments({ ...query, isActive: true })
+      .exec();
+    const ended = await this.conversationModel
+      .countDocuments({ ...query, isActive: false })
+      .exec();
 
     const conversationsByType = await this.conversationModel.aggregate([
       { $match: query },
@@ -168,7 +191,9 @@ export class AdminService {
 
     const userActivity = await Promise.all(
       uniqueUsers.slice(0, 100).map(async (userId) => {
-        const conversationCount = await this.conversationModel.countDocuments({ userId }).exec();
+        const conversationCount = await this.conversationModel
+          .countDocuments({ userId })
+          .exec();
         const conversations = await this.conversationModel
           .find({ userId })
           .select('_id')
@@ -193,12 +218,17 @@ export class AdminService {
   }
 
   async getSystemHealth() {
-    const mongoConnected = this.conversationModel.db.readyState === 1;
+    const mongoConnected =
+      (this.conversationModel.db.readyState as number) === 1;
     const geminiInitialized = this.geminiService.isInitialized();
 
-    const totalConversations = await this.conversationModel.countDocuments().exec();
+    const totalConversations = await this.conversationModel
+      .countDocuments()
+      .exec();
     const totalMessages = await this.messageModel.countDocuments().exec();
-    const totalTemplates = await this.promptTemplateModel.countDocuments().exec();
+    const totalTemplates = await this.promptTemplateModel
+      .countDocuments()
+      .exec();
 
     return {
       status: mongoConnected && geminiInitialized ? 'healthy' : 'degraded',
@@ -257,8 +287,10 @@ export class AdminService {
   }
 
   async getConversationDetails(conversationId: string) {
-    const conversation = await this.conversationService.getConversation(conversationId);
-    const messages = await this.conversationService.getConversationMessages(conversationId);
+    const conversation =
+      await this.conversationService.getConversation(conversationId);
+    const messages =
+      await this.conversationService.getConversationMessages(conversationId);
 
     return {
       conversation,

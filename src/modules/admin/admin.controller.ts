@@ -9,7 +9,14 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiQuery, ApiParam } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiQuery,
+  ApiParam,
+} from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { CreatePromptTemplateDto } from '../prompt/dto/create-prompt-template.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -27,10 +34,25 @@ export class AdminController {
   // ==================== Prompt Templates ====================
 
   @Get('prompts')
-  @ApiOperation({ summary: 'Get all prompt templates', description: 'Retrieve all prompt templates, optionally filtered by layer (system, user, context)' })
-  @ApiQuery({ name: 'layer', required: false, enum: ['system', 'user', 'context'], description: 'Filter by prompt layer' })
-  @ApiResponse({ status: 200, description: 'List of prompt templates retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - Missing or invalid JWT' })
+  @ApiOperation({
+    summary: 'Get all prompt templates',
+    description:
+      'Retrieve all prompt templates, optionally filtered by layer (system, user, context)',
+  })
+  @ApiQuery({
+    name: 'layer',
+    required: false,
+    enum: ['system', 'user', 'context'],
+    description: 'Filter by prompt layer',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'List of prompt templates retrieved successfully',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Missing or invalid JWT',
+  })
   @ApiResponse({ status: 403, description: 'Forbidden - User is not an admin' })
   async getAllPrompts(@Query('layer') layer?: string) {
     if (layer) {
@@ -40,9 +62,19 @@ export class AdminController {
   }
 
   @Get('prompts/:name')
-  @ApiOperation({ summary: 'Get prompt template by name', description: 'Retrieve a specific prompt template by its unique name' })
-  @ApiParam({ name: 'name', description: 'Template name', example: 'system_core' })
-  @ApiResponse({ status: 200, description: 'Prompt template retrieved successfully' })
+  @ApiOperation({
+    summary: 'Get prompt template by name',
+    description: 'Retrieve a specific prompt template by its unique name',
+  })
+  @ApiParam({
+    name: 'name',
+    description: 'Template name',
+    example: 'system_core',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Prompt template retrieved successfully',
+  })
   @ApiResponse({ status: 404, description: 'Template not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })
@@ -51,8 +83,14 @@ export class AdminController {
   }
 
   @Post('prompts')
-  @ApiOperation({ summary: 'Create prompt template', description: 'Create a new prompt template for the 3-layer prompt system' })
-  @ApiResponse({ status: 201, description: 'Prompt template created successfully' })
+  @ApiOperation({
+    summary: 'Create prompt template',
+    description: 'Create a new prompt template for the 3-layer prompt system',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Prompt template created successfully',
+  })
   @ApiResponse({ status: 400, description: 'Validation error' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })
@@ -61,9 +99,19 @@ export class AdminController {
   }
 
   @Put('prompts/:name')
-  @ApiOperation({ summary: 'Update prompt template', description: 'Update an existing prompt template by name' })
-  @ApiParam({ name: 'name', description: 'Template name to update', example: 'system_core' })
-  @ApiResponse({ status: 200, description: 'Prompt template updated successfully' })
+  @ApiOperation({
+    summary: 'Update prompt template',
+    description: 'Update an existing prompt template by name',
+  })
+  @ApiParam({
+    name: 'name',
+    description: 'Template name to update',
+    example: 'system_core',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Prompt template updated successfully',
+  })
   @ApiResponse({ status: 404, description: 'Template not found' })
   @ApiResponse({ status: 400, description: 'Validation error' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -76,9 +124,19 @@ export class AdminController {
   }
 
   @Delete('prompts/:name')
-  @ApiOperation({ summary: 'Delete prompt template', description: 'Delete a prompt template by name' })
-  @ApiParam({ name: 'name', description: 'Template name to delete', example: 'user_custom' })
-  @ApiResponse({ status: 200, description: 'Prompt template deleted successfully' })
+  @ApiOperation({
+    summary: 'Delete prompt template',
+    description: 'Delete a prompt template by name',
+  })
+  @ApiParam({
+    name: 'name',
+    description: 'Template name to delete',
+    example: 'user_custom',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Prompt template deleted successfully',
+  })
   @ApiResponse({ status: 404, description: 'Template not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })
@@ -87,9 +145,19 @@ export class AdminController {
   }
 
   @Put('prompts/:name/toggle')
-  @ApiOperation({ summary: 'Toggle template status', description: 'Toggle the active/inactive status of a prompt template' })
-  @ApiParam({ name: 'name', description: 'Template name to toggle', example: 'system_core' })
-  @ApiResponse({ status: 200, description: 'Template status toggled successfully' })
+  @ApiOperation({
+    summary: 'Toggle template status',
+    description: 'Toggle the active/inactive status of a prompt template',
+  })
+  @ApiParam({
+    name: 'name',
+    description: 'Template name to toggle',
+    example: 'system_core',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Template status toggled successfully',
+  })
   @ApiResponse({ status: 404, description: 'Template not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })
@@ -100,11 +168,30 @@ export class AdminController {
   // ==================== Statistics ====================
 
   @Get('stats/conversations')
-  @ApiOperation({ summary: 'Get conversation statistics', description: 'Get statistics about conversations (total, active, ended, by type)' })
-  @ApiQuery({ name: 'userId', required: false, description: 'Filter by user ID' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Filter from date (ISO 8601 format)' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Filter to date (ISO 8601 format)' })
-  @ApiResponse({ status: 200, description: 'Conversation statistics retrieved successfully' })
+  @ApiOperation({
+    summary: 'Get conversation statistics',
+    description:
+      'Get statistics about conversations (total, active, ended, by type)',
+  })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    description: 'Filter by user ID',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Filter from date (ISO 8601 format)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Filter to date (ISO 8601 format)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Conversation statistics retrieved successfully',
+  })
   async getConversationStats(
     @Query('userId') userId?: string,
     @Query('startDate') startDate?: string,
@@ -118,11 +205,30 @@ export class AdminController {
   }
 
   @Get('stats/messages')
-  @ApiOperation({ summary: 'Get message statistics', description: 'Get statistics about messages (total, by role, by type, average length)' })
-  @ApiQuery({ name: 'userId', required: false, description: 'Filter by user ID' })
-  @ApiQuery({ name: 'startDate', required: false, description: 'Filter from date (ISO 8601 format)' })
-  @ApiQuery({ name: 'endDate', required: false, description: 'Filter to date (ISO 8601 format)' })
-  @ApiResponse({ status: 200, description: 'Message statistics retrieved successfully' })
+  @ApiOperation({
+    summary: 'Get message statistics',
+    description:
+      'Get statistics about messages (total, by role, by type, average length)',
+  })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    description: 'Filter by user ID',
+  })
+  @ApiQuery({
+    name: 'startDate',
+    required: false,
+    description: 'Filter from date (ISO 8601 format)',
+  })
+  @ApiQuery({
+    name: 'endDate',
+    required: false,
+    description: 'Filter to date (ISO 8601 format)',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Message statistics retrieved successfully',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })
   async getMessageStats(
@@ -138,8 +244,15 @@ export class AdminController {
   }
 
   @Get('stats/users')
-  @ApiOperation({ summary: 'Get user statistics', description: 'Get user activity summary including total users, active users, and top users by conversation count' })
-  @ApiResponse({ status: 200, description: 'User statistics retrieved successfully' })
+  @ApiOperation({
+    summary: 'Get user statistics',
+    description:
+      'Get user activity summary including total users, active users, and top users by conversation count',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User statistics retrieved successfully',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })
   async getUserStats() {
@@ -147,8 +260,15 @@ export class AdminController {
   }
 
   @Get('health')
-  @ApiOperation({ summary: 'System health check', description: 'Get system health status including MongoDB and Gemini API status' })
-  @ApiResponse({ status: 200, description: 'System health status retrieved successfully' })
+  @ApiOperation({
+    summary: 'System health check',
+    description:
+      'Get system health status including MongoDB and Gemini API status',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'System health status retrieved successfully',
+  })
   async getHealth() {
     return this.adminService.getSystemHealth();
   }
@@ -156,12 +276,38 @@ export class AdminController {
   // ==================== Conversations Management ====================
 
   @Get('conversations')
-  @ApiOperation({ summary: 'Get all conversations', description: 'Retrieve all conversations with optional filtering and pagination' })
-  @ApiQuery({ name: 'userId', required: false, description: 'Filter by user ID' })
-  @ApiQuery({ name: 'isActive', required: false, description: 'Filter by active status (true/false)' })
-  @ApiQuery({ name: 'page', required: false, description: 'Page number for pagination', example: 1 })
-  @ApiQuery({ name: 'limit', required: false, description: 'Items per page', example: 20 })
-  @ApiResponse({ status: 200, description: 'Conversations retrieved successfully with pagination metadata' })
+  @ApiOperation({
+    summary: 'Get all conversations',
+    description:
+      'Retrieve all conversations with optional filtering and pagination',
+  })
+  @ApiQuery({
+    name: 'userId',
+    required: false,
+    description: 'Filter by user ID',
+  })
+  @ApiQuery({
+    name: 'isActive',
+    required: false,
+    description: 'Filter by active status (true/false)',
+  })
+  @ApiQuery({
+    name: 'page',
+    required: false,
+    description: 'Page number for pagination',
+    example: 1,
+  })
+  @ApiQuery({
+    name: 'limit',
+    required: false,
+    description: 'Items per page',
+    example: 20,
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Conversations retrieved successfully with pagination metadata',
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })
   async getAllConversations(
@@ -172,16 +318,24 @@ export class AdminController {
   ) {
     return this.adminService.getConversations({
       userId,
-      isActive: isActive === 'true' ? true : isActive === 'false' ? false : undefined,
+      isActive:
+        isActive === 'true' ? true : isActive === 'false' ? false : undefined,
       page: page ? parseInt(page) : 1,
       limit: limit ? parseInt(limit) : 20,
     });
   }
 
   @Get('conversations/:id')
-  @ApiOperation({ summary: 'Get conversation details', description: 'Retrieve detailed information about a specific conversation including all messages' })
+  @ApiOperation({
+    summary: 'Get conversation details',
+    description:
+      'Retrieve detailed information about a specific conversation including all messages',
+  })
   @ApiParam({ name: 'id', description: 'Conversation ID' })
-  @ApiResponse({ status: 200, description: 'Conversation details retrieved successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Conversation details retrieved successfully',
+  })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })
@@ -190,9 +344,15 @@ export class AdminController {
   }
 
   @Delete('conversations/:id')
-  @ApiOperation({ summary: 'Delete conversation', description: 'Permanently delete a conversation and all its messages' })
+  @ApiOperation({
+    summary: 'Delete conversation',
+    description: 'Permanently delete a conversation and all its messages',
+  })
   @ApiParam({ name: 'id', description: 'Conversation ID to delete' })
-  @ApiResponse({ status: 200, description: 'Conversation deleted successfully' })
+  @ApiResponse({
+    status: 200,
+    description: 'Conversation deleted successfully',
+  })
   @ApiResponse({ status: 404, description: 'Conversation not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })

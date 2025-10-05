@@ -20,7 +20,9 @@ export class GeminiService implements OnModuleInit {
     const apiKey = this.configService.get<string>('GEMINI_API_KEY');
 
     if (!apiKey || apiKey === 'your_gemini_api_key_here') {
-      this.logger.warn('Gemini API Key not configured. Set GEMINI_API_KEY in .env file');
+      this.logger.warn(
+        'Gemini API Key not configured. Set GEMINI_API_KEY in .env file',
+      );
       return;
     }
 
@@ -42,7 +44,9 @@ export class GeminiService implements OnModuleInit {
     systemPrompt?: string,
   ): Promise<GeminiResponse> {
     if (!this.chatModel) {
-      throw new Error('Gemini API not initialized. Check your API key configuration.');
+      throw new Error(
+        'Gemini API not initialized. Check your API key configuration.',
+      );
     }
 
     const startTime = Date.now();
@@ -61,7 +65,7 @@ export class GeminiService implements OnModuleInit {
       });
 
       const result = await this.chatModel.generateContent(fullPrompt);
-      const response = await result.response;
+      const response = result.response;
       const text = response.text();
 
       const processingTime = Date.now() - startTime;
@@ -87,7 +91,9 @@ export class GeminiService implements OnModuleInit {
     systemPrompt?: string,
   ): Promise<AsyncGenerator<string>> {
     if (!this.chatModel) {
-      throw new Error('Gemini API not initialized. Check your API key configuration.');
+      throw new Error(
+        'Gemini API not initialized. Check your API key configuration.',
+      );
     }
 
     try {
@@ -106,7 +112,9 @@ export class GeminiService implements OnModuleInit {
       return this.streamGenerator(result);
     } catch (error) {
       this.logger.error('Error generating streaming response', error);
-      throw new Error(`Failed to generate streaming response: ${error.message}`);
+      throw new Error(
+        `Failed to generate streaming response: ${error.message}`,
+      );
     }
   }
 
@@ -122,9 +130,9 @@ export class GeminiService implements OnModuleInit {
    * Note: Gemini Pro doesn't natively support audio transcription
    * This is a placeholder for future implementation or integration with other services
    */
-  async transcribeAudio(
-    audioBuffer: Buffer,
-    mimeType: string,
+  transcribeAudio(
+    _audioBuffer: Buffer,
+    _mimeType: string,
   ): Promise<AudioTranscriptionResult> {
     this.logger.warn('Audio transcription not yet implemented with Gemini API');
 
@@ -134,15 +142,22 @@ export class GeminiService implements OnModuleInit {
     // 2. Use Gemini Pro Vision/Audio when available
     // 3. Use alternative transcription service
 
-    throw new Error('Audio transcription not yet implemented');
+    return Promise.reject(
+      new Error(`Audio transcription not yet implemented `),
+    );
   }
 
   /**
    * Analyze text for grammar and vocabulary
    */
-  async analyzeText(text: string, targetLevel: string = 'intermediate'): Promise<any> {
+  async analyzeText(
+    text: string,
+    targetLevel: string = 'intermediate',
+  ): Promise<any> {
     if (!this.chatModel) {
-      throw new Error('Gemini API not initialized. Check your API key configuration.');
+      throw new Error(
+        'Gemini API not initialized. Check your API key configuration.',
+      );
     }
 
     const analysisPrompt = `
@@ -162,7 +177,7 @@ Provide a JSON response with the following structure:
 
     try {
       const result = await this.chatModel.generateContent(analysisPrompt);
-      const response = await result.response;
+      const response = result.response;
       const text = response.text();
 
       // Extract JSON from response

@@ -21,7 +21,7 @@ async function bootstrap() {
 
   // Enable CORS
   const corsOrigins = process.env.CORS_ORIGIN
-    ? process.env.CORS_ORIGIN.split(',').map(origin => origin.trim())
+    ? process.env.CORS_ORIGIN.split(',').map((origin) => origin.trim())
     : '*';
 
   app.enableCors({
@@ -32,7 +32,9 @@ async function bootstrap() {
   // Swagger Configuration
   const config = new DocumentBuilder()
     .setTitle('LLM Teach Me API')
-    .setDescription('AI-powered English tutor backend with real-time conversations, prompt engineering, and admin panel')
+    .setDescription(
+      'AI-powered English tutor backend with real-time conversations, prompt engineering, and admin panel',
+    )
     .setVersion('1.0')
     .addTag('auth', 'Authentication endpoints')
     .addTag('admin', 'Admin panel endpoints (requires admin role)')
@@ -60,7 +62,11 @@ async function bootstrap() {
   });
 
   await app.listen(process.env.PORT ?? 3000);
-  console.log(`Application is running on: http://localhost:${process.env.PORT ?? 3000}`);
-  console.log(`Swagger documentation available at: http://localhost:${process.env.PORT ?? 3000}/api`);
+  console.log(
+    `Application is running on: http://localhost:${process.env.PORT ?? 3000}`,
+  );
+  console.log(
+    `Swagger documentation available at: http://localhost:${process.env.PORT ?? 3000}/api`,
+  );
 }
-bootstrap();
+void bootstrap();

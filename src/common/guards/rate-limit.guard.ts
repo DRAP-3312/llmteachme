@@ -9,7 +9,10 @@ import { ConfigService } from '@nestjs/config';
 
 @Injectable()
 export class RateLimitGuard implements CanActivate {
-  private requestCounts = new Map<string, { count: number; resetTime: number }>();
+  private requestCounts = new Map<
+    string,
+    { count: number; resetTime: number }
+  >();
 
   constructor(private configService: ConfigService) {}
 

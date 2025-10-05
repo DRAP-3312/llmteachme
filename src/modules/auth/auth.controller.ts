@@ -1,5 +1,18 @@
-import { Controller, Post, Body, Get, UseGuards, HttpCode } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  UseGuards,
+  HttpCode,
+} from '@nestjs/common';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiResponse,
+  ApiBearerAuth,
+  ApiBody,
+} from '@nestjs/swagger';
 import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
@@ -14,9 +27,19 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  @ApiOperation({ summary: 'Register a new user', description: 'Create a new user account with email, password, and name' })
-  @ApiResponse({ status: 201, description: 'User successfully registered. Returns access token and user data.' })
-  @ApiResponse({ status: 409, description: 'User with this email already exists' })
+  @ApiOperation({
+    summary: 'Register a new user',
+    description: 'Create a new user account with email, password, and name',
+  })
+  @ApiResponse({
+    status: 201,
+    description:
+      'User successfully registered. Returns access token and user data.',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'User with this email already exists',
+  })
   @ApiResponse({ status: 400, description: 'Validation error' })
   async register(@Body() dto: RegisterDto) {
     return this.authService.register(dto);
@@ -25,18 +48,43 @@ export class AuthController {
   @Public()
   @Post('login')
   @HttpCode(200)
-  @ApiOperation({ summary: 'Login user', description: 'Authenticate user and receive JWT access and refresh tokens' })
-  @ApiResponse({ status: 200, description: 'Login successful. Returns access token, refresh token, and user data.' })
-  @ApiResponse({ status: 401, description: 'Invalid credentials or user account disabled' })
+  @ApiOperation({
+    summary: 'Login user',
+    description: 'Authenticate user and receive JWT access and refresh tokens',
+  })
+  @ApiResponse({
+    status: 200,
+    description:
+      'Login successful. Returns access token, refresh token, and user data.',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Invalid credentials or user account disabled',
+  })
   async login(@Body() dto: LoginDto) {
     return this.authService.login(dto);
   }
 
   @Public()
   @Post('refresh')
-  @ApiOperation({ summary: 'Refresh access token', description: 'Get a new access token using a valid refresh token' })
-  @ApiBody({ schema: { properties: { refreshToken: { type: 'string', example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' } } } })
-  @ApiResponse({ status: 201, description: 'Token refreshed successfully. Returns new access token.' })
+  @ApiOperation({
+    summary: 'Refresh access token',
+    description: 'Get a new access token using a valid refresh token',
+  })
+  @ApiBody({
+    schema: {
+      properties: {
+        refreshToken: {
+          type: 'string',
+          example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'Token refreshed successfully. Returns new access token.',
+  })
   @ApiResponse({ status: 401, description: 'Invalid or expired refresh token' })
   async refreshToken(@Body('refreshToken') refreshToken: string) {
     return this.authService.refreshToken(refreshToken);
@@ -45,9 +93,18 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Get('me')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Get current user profile', description: 'Retrieve the authenticated user\'s profile information' })
-  @ApiResponse({ status: 200, description: 'User profile retrieved successfully' })
-  @ApiResponse({ status: 401, description: 'Unauthorized - Invalid or missing JWT token' })
+  @ApiOperation({
+    summary: 'Get current user profile',
+    description: "Retrieve the authenticated user's profile information",
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'User profile retrieved successfully',
+  })
+  @ApiResponse({
+    status: 401,
+    description: 'Unauthorized - Invalid or missing JWT token',
+  })
   async getProfile(@CurrentUser() user: any) {
     return this.authService.getUserById(user.userId);
   }
@@ -55,7 +112,10 @@ export class AuthController {
   @UseGuards(JwtAuthGuard)
   @Post('logout')
   @ApiBearerAuth('JWT-auth')
-  @ApiOperation({ summary: 'Logout user', description: 'Invalidate the user\'s refresh token' })
+  @ApiOperation({
+    summary: 'Logout user',
+    description: "Invalidate the user's refresh token",
+  })
   @ApiResponse({ status: 201, description: 'Logged out successfully' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   async logout(@CurrentUser('userId') userId: string) {
@@ -63,4 +123,3 @@ export class AuthController {
     return { message: 'Logged out successfully' };
   }
 }
-

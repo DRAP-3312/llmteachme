@@ -26,7 +26,7 @@ export class GlobalExceptionFilter implements ExceptionFilter {
         message = (exceptionResponse as any).message || message;
         error = (exceptionResponse as any).error || error;
       } else {
-        message = exceptionResponse as string;
+        message = exceptionResponse;
       }
     } else if (exception instanceof Error) {
       message = exception.message;

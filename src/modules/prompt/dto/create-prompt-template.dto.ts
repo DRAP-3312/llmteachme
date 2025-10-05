@@ -11,14 +11,14 @@ import { ApiProperty } from '@nestjs/swagger';
 export class CreatePromptTemplateDto {
   @ApiProperty({
     description: 'Unique template name',
-    example: 'system_core'
+    example: 'system_core',
   })
   @IsString()
   name: string;
 
   @ApiProperty({
     description: 'Template description',
-    example: 'Core system instructions for the AI tutor'
+    example: 'Core system instructions for the AI tutor',
   })
   @IsString()
   description: string;
@@ -26,14 +26,14 @@ export class CreatePromptTemplateDto {
   @ApiProperty({
     description: 'Prompt layer in the 3-layer system',
     enum: ['system', 'user', 'context'],
-    example: 'system'
+    example: 'system',
   })
   @IsEnum(['system', 'user', 'context'])
   layer: string;
 
   @ApiProperty({
     description: 'Prompt template content with {{variable}} placeholders',
-    example: 'You are an AI English tutor. Student level: {{level}}'
+    example: 'You are an AI English tutor. Student level: {{level}}',
   })
   @IsString()
   template: string;
@@ -42,7 +42,7 @@ export class CreatePromptTemplateDto {
     description: 'List of variable names used in template',
     example: ['level', 'topic'],
     required: false,
-    type: [String]
+    type: [String],
   })
   @IsArray()
   @IsString({ each: true })
@@ -53,7 +53,7 @@ export class CreatePromptTemplateDto {
     description: 'Tags for categorization',
     example: ['grammar', 'beginner'],
     required: false,
-    type: [String]
+    type: [String],
   })
   @IsArray()
   @IsString({ each: true })
@@ -64,7 +64,7 @@ export class CreatePromptTemplateDto {
     description: 'Whether template is active',
     example: true,
     required: false,
-    default: true
+    default: true,
   })
   @IsBoolean()
   @IsOptional()
@@ -74,7 +74,7 @@ export class CreatePromptTemplateDto {
     description: 'Template priority (higher = more important)',
     example: 10,
     required: false,
-    default: 0
+    default: 0,
   })
   @IsNumber()
   @IsOptional()
@@ -83,7 +83,11 @@ export class CreatePromptTemplateDto {
   @ApiProperty({
     description: 'Additional metadata',
     required: false,
-    example: { category: 'conversation', targetLevel: 'intermediate', language: 'en' }
+    example: {
+      category: 'conversation',
+      targetLevel: 'intermediate',
+      language: 'en',
+    },
   })
   @IsOptional()
   metadata?: {

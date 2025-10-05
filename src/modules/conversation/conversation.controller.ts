@@ -79,14 +79,19 @@ export class ConversationController {
     @Query('conversationType') conversationType?: string,
   ) {
     const userId = user._id.toString();
-    let conversations = await this.conversationService.getUserConversations(userId);
+    let conversations =
+      await this.conversationService.getUserConversations(userId);
 
     // Aplicar filtros manualmente si se proporcionan
     if (isActive !== undefined) {
-      conversations = conversations.filter(conv => conv.isActive === isActive);
+      conversations = conversations.filter(
+        (conv) => conv.isActive === isActive,
+      );
     }
     if (conversationType) {
-      conversations = conversations.filter(conv => conv.conversationType === conversationType);
+      conversations = conversations.filter(
+        (conv) => conv.conversationType === conversationType,
+      );
     }
 
     return conversations;

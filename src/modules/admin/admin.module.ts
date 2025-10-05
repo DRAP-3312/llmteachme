@@ -2,8 +2,14 @@ import { Module } from '@nestjs/common';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AdminController } from './admin.controller';
 import { AdminService } from './admin.service';
-import { PromptTemplate, PromptTemplateSchema } from '../prompt/schemas/prompt-template.schema';
-import { Conversation, ConversationSchema } from '../conversation/schemas/conversation.schema';
+import {
+  PromptTemplate,
+  PromptTemplateSchema,
+} from '../prompt/schemas/prompt-template.schema';
+import {
+  Conversation,
+  ConversationSchema,
+} from '../conversation/schemas/conversation.schema';
 import { Message, MessageSchema } from '../conversation/schemas/message.schema';
 import { PromptModule } from '../prompt/prompt.module';
 import { ConversationModule } from '../conversation/conversation.module';

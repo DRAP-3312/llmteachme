@@ -1,7 +1,10 @@
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { PromptTemplate, PromptTemplateDocument } from './schemas/prompt-template.schema';
+import {
+  PromptTemplate,
+  PromptTemplateDocument,
+} from './schemas/prompt-template.schema';
 import {
   PromptVariables,
   CompiledPrompt,
@@ -66,7 +69,8 @@ export class PromptService implements OnModuleInit {
         userId: context.userId,
         level: context.metadata?.level || 'intermediate',
         topic: context.metadata?.topic || 'general conversation',
-        userGoals: context.metadata?.userGoals?.join(', ') || 'improve English skills',
+        userGoals:
+          context.metadata?.userGoals?.join(', ') || 'improve English skills',
         conversationHistory: this.formatConversationHistory(context.history),
       };
 
@@ -78,7 +82,9 @@ export class PromptService implements OnModuleInit {
       // Combine all layers
       const fullPrompt = `${systemPrompt}\n\n${userPrompt}\n\n${contextPrompt}`;
 
-      this.logger.debug(`Compiled prompt with ${systemPrompts.length + userPrompts.length + contextPrompts.length} templates`);
+      this.logger.debug(
+        `Compiled prompt with ${systemPrompts.length + userPrompts.length + contextPrompts.length} templates`,
+      );
 
       return {
         systemPrompt,
@@ -108,13 +114,18 @@ export class PromptService implements OnModuleInit {
    * Replace variables in template string
    * Format: {{variableName}}
    */
-  private replaceVariables(template: string, variables: PromptVariables): string {
+  private replaceVariables(
+    template: string,
+    variables: PromptVariables,
+  ): string {
     let result = template;
 
     Object.keys(variables).forEach((key) => {
       const regex = new RegExp(`\\{\\{${key}\\}\\}`, 'g');
       const value = variables[key];
-      result = result.replace(regex, String(value));
+      const stringValue =
+        typeof value === 'object' ? JSON.stringify(value) : String(value);
+      result = result.replace(regex, stringValue);
     });
 
     return result;
@@ -155,12 +166,17 @@ export class PromptService implements OnModuleInit {
     let sanitizedInput = userInput;
     if (!isSafe) {
       // Remove markdown code blocks that might contain system prompts
-      sanitizedInput = sanitizedInput.replace(/```[\s\S]*?```/g, '[code block removed]');
+      sanitizedInput = sanitizedInput.replace(
+        /```[\s\S]*?```/g,
+        '[code block removed]',
+      );
       // Remove excessive newlines that might be used for prompt breaking
       sanitizedInput = sanitizedInput.replace(/\n{3,}/g, '\n\n');
     }
 
-    this.logger.debug(`Injection check: ${isSafe ? 'SAFE' : 'THREAT DETECTED'}`);
+    this.logger.debug(
+      `Injection check: ${isSafe ? 'SAFE' : 'THREAT DETECTED'}`,
+    );
     if (!isSafe) {
       this.logger.warn(`Prompt injection threats: ${threats.join(', ')}`);
     }
@@ -175,7 +191,9 @@ export class PromptService implements OnModuleInit {
   /**
    * Create a new prompt template
    */
-  async createTemplate(templateData: Partial<PromptTemplate>): Promise<PromptTemplateDocument> {
+  async createTemplate(
+    templateData: Partial<PromptTemplate>,
+  ): Promise<PromptTemplateDocument> {
     const template = new this.promptTemplateModel(templateData);
     return template.save();
   }
@@ -183,7 +201,9 @@ export class PromptService implements OnModuleInit {
   /**
    * Get all active templates for a specific layer
    */
-  async getTemplatesByLayer(layer: 'system' | 'user' | 'context'): Promise<PromptTemplateDocument[]> {
+  async getTemplatesByLayer(
+    layer: 'system' | 'user' | 'context',
+  ): Promise<PromptTemplateDocument[]> {
     return this.promptTemplateModel
       .find({ layer, isActive: true })
       .sort({ priority: -1 })
@@ -291,6 +311,8 @@ Continue the conversation naturally, helping the student practice English.`,
     ];
 
     await this.promptTemplateModel.insertMany(defaultTemplates);
-    this.logger.log(`Seeded ${defaultTemplates.length} default prompt templates`);
+    this.logger.log(
+      `Seeded ${defaultTemplates.length} default prompt templates`,
+    );
   }
 }
