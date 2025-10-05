@@ -25,13 +25,11 @@ export class AuthService {
   /**
    * Register a new user
    */
-  async register(
-    dto: RegisterDto,
-  ): Promise<{ accessToken: string; user: any }> {
+  async register(dto: RegisterDto): Promise<{ message: string }> {
     // Check if user exists
-    const existingUser = await this.userModel.findOne({ email: dto.email });
+    const existingUser = await this.userModel.findOne({ name: dto.name });
     if (existingUser) {
-      throw new ConflictException('User with this email already exists');
+      throw new ConflictException('User with this name already exists');
     }
 
     // Hash password
@@ -39,22 +37,21 @@ export class AuthService {
 
     // Create user
     const user = new this.userModel({
-      email: dto.email,
-      password: hashedPassword,
       name: dto.name,
+      password: hashedPassword,
+      preferredTopics: dto.preferredTopics || [],
       role: 'user',
+      isActive: true,
     });
 
     await user.save();
 
-    this.logger.log(`User registered: ${user.email}`);
+    this.logger.log(`User registered: ${user.name}`);
 
-    // Generate tokens
-    const tokens = await this.generateTokens(user);
+    // TODO: Create UserStats for the user
 
     return {
-      accessToken: tokens.accessToken,
-      user: this.sanitizeUser(user),
+      message: 'Usuario creado exitosamente',
     };
   }
 
@@ -65,7 +62,7 @@ export class AuthService {
     dto: LoginDto,
   ): Promise<{ accessToken: string; refreshToken: string; user: any }> {
     // Find user
-    const user = await this.userModel.findOne({ email: dto.email });
+    const user = await this.userModel.findOne({ name: dto.name });
     if (!user) {
       throw new UnauthorizedException('Invalid credentials');
     }
@@ -81,11 +78,7 @@ export class AuthService {
       throw new UnauthorizedException('User account is disabled');
     }
 
-    // Update last login
-    user.lastLogin = new Date();
-    await user.save();
-
-    this.logger.log(`User logged in: ${user.email}`);
+    this.logger.log(`User logged in: ${user.name}`);
 
     // Generate tokens
     const tokens = await this.generateTokens(user);
@@ -116,20 +109,13 @@ export class AuthService {
       const payload = this.jwtService.verify(refreshToken);
       const user = await this.validateUser(payload.sub);
 
-      // Verify stored refresh token
-      const isRefreshTokenValid = await bcrypt.compare(
-        refreshToken,
-        user.refreshToken || '',
-      );
-
-      if (!isRefreshTokenValid) {
-        throw new UnauthorizedException('Invalid refresh token');
-      }
+      // TODO: Verify stored refresh token in RefreshToken schema
 
       // Generate new access token
       const accessToken = this.jwtService.sign({
         sub: user._id,
-        email: user.email,
+        userId: (user._id as any).toString(),
+        name: user.name,
         role: user.role,
       });
 
@@ -147,18 +133,15 @@ export class AuthService {
   ): Promise<{ accessToken: string; refreshToken: string }> {
     const payload = {
       sub: (user._id as any).toString(),
-      email: user.email,
+      userId: (user._id as any).toString(),
+      name: user.name,
       role: user.role,
     };
 
     const accessToken = this.jwtService.sign(payload, { expiresIn: '15m' });
     const refreshToken = this.jwtService.sign(payload, { expiresIn: '7d' });
 
-    // Store hashed refresh token
-    const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
-    await this.userModel.findByIdAndUpdate(user._id, {
-      refreshToken: hashedRefreshToken,
-    });
+    // TODO: Store refresh token in RefreshToken schema
 
     return { accessToken, refreshToken };
   }
@@ -169,7 +152,6 @@ export class AuthService {
   private sanitizeUser(user: UserDocument): any {
     const userObj = user.toObject();
     delete userObj.password;
-    delete userObj.refreshToken;
     return userObj;
   }
 
@@ -177,7 +159,7 @@ export class AuthService {
    * Logout user (invalidate refresh token)
    */
   async logout(userId: string): Promise<void> {
-    await this.userModel.findByIdAndUpdate(userId, { refreshToken: null });
+    // TODO: Delete refresh token from RefreshToken schema
     this.logger.log(`User logged out: ${userId}`);
   }
 
