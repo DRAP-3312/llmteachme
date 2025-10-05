@@ -40,7 +40,6 @@ export class PromptTemplate {
 export const PromptTemplateSchema =
   SchemaFactory.createForClass(PromptTemplate);
 
-// Indexes
-PromptTemplateSchema.index({ name: 1 });
+// Indexes (name already has unique index from @Prop)
 PromptTemplateSchema.index({ layer: 1, isActive: 1 });
 PromptTemplateSchema.index({ tags: 1 });

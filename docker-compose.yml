@@ -12,7 +12,6 @@ services:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
-      - ./deploy/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
     networks:
       - llmteachme-network
     healthcheck:
@@ -43,7 +42,7 @@ services:
       THROTTLE_TTL: ${THROTTLE_TTL:-60}
       THROTTLE_LIMIT: ${THROTTLE_LIMIT:-10}
     ports:
-      - "3000:3000"
+      - "${PORT:-3000}:${PORT:-3000}"
     depends_on:
       llmteachme-mongodb:
         condition: service_healthy
