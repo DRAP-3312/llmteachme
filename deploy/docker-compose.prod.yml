@@ -1,0 +1,93 @@
+services:
+  llmteachme-api:
+    image: llmteachme-api:latest
+    environment:
+      NODE_ENV: production
+      PORT: PORT_PLACEHOLDER
+      MONGODB_URI: MONGO_URL_PLACEHOLDER
+      JWT_SECRET: JWT_SECRET_PLACEHOLDER
+      JWT_EXPIRES_IN: 15m
+      JWT_REFRESH_SECRET: JWT_REFRESH_SECRET_PLACEHOLDER
+      JWT_REFRESH_EXPIRES_IN: 7d
+      GEMINI_API_KEY: GEMINI_API_KEY_PLACEHOLDER
+      GEMINI_MODEL: GEMINI_MODEL_PLACEHOLDER
+      CORS_ORIGIN: CORS_ORIGIN_PLACEHOLDER
+      THROTTLE_TTL: 60
+      THROTTLE_LIMIT: 10
+    networks:
+      - caddy
+      - llmteachme-internal
+    deploy:
+      labels:
+        caddy: llmteachme.saguarodrap.dev
+        caddy.reverse_proxy: "{{upstreams PORT_PLACEHOLDER}}"
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 10s
+        max_attempts: 3
+        window: 60s
+      resources:
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+        limits:
+          cpus: "1.0"
+          memory: 512M
+      update_config:
+        parallelism: 1
+        delay: 10s
+        failure_action: rollback
+        order: start-first
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:PORT_PLACEHOLDER/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  llmteachme-mongodb:
+    image: mongo:7.0
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: MONGO_PASSWORD_PLACEHOLDER
+      MONGO_INITDB_DATABASE: llmteachme
+    volumes:
+      - llmteachme_mongodb_data:/data/db
+      - ./init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
+    networks:
+      - llmteachme-internal
+    deploy:
+      replicas: 1
+      restart_policy:
+        condition: any
+        delay: 10s
+        max_attempts: 3
+        window: 60s
+      resources:
+        reservations:
+          cpus: "0.25"
+          memory: 256M
+        limits:
+          cpus: "0.5"
+          memory: 512M
+      placement:
+        constraints:
+          - node.role == manager
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+networks:
+  caddy:
+    external: true
+  llmteachme-internal:
+    driver: overlay
+    attachable: false
+
+volumes:
+  llmteachme_mongodb_data:
+    driver: local

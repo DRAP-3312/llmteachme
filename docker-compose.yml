@@ -1,23 +1,70 @@
-version: '3.8'
-
 services:
-  mongodb:
+  # Base de datos MongoDB
+  llmteachme-mongodb:
     image: mongo:7.0
     container_name: llmteachme-mongodb
     restart: unless-stopped
     environment:
-      MONGO_INITDB_DATABASE: llmteachme
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_USERNAME:-admin}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_PASSWORD:-dev_password_123}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-llmteachme}
     ports:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
+      - ./deploy/init-mongo.js:/docker-entrypoint-initdb.d/init-mongo.js:ro
     networks:
       - llmteachme-network
+    healthcheck:
+      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
-networks:
-  llmteachme-network:
-    driver: bridge
+  # API NestJS
+  llmteachme-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: llmteachme-api
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-development}
+      PORT: ${PORT:-3000}
+      MONGODB_URI: ${MONGODB_URI:-mongodb://admin:dev_password_123@llmteachme-mongodb:27017/llmteachme?authSource=admin}
+      JWT_SECRET: ${JWT_SECRET:-dev-jwt-secret-min-32-characters-long-for-security}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-15m}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-dev-refresh-secret-min-32-chars}
+      JWT_REFRESH_EXPIRES_IN: ${JWT_REFRESH_EXPIRES_IN:-7d}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-2.0-flash}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:5173}
+      THROTTLE_TTL: ${THROTTLE_TTL:-60}
+      THROTTLE_LIMIT: ${THROTTLE_LIMIT:-10}
+    ports:
+      - "3000:3000"
+    depends_on:
+      llmteachme-mongodb:
+        condition: service_healthy
+    networks:
+      - llmteachme-network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:${PORT:-3000}/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
 
+# Volúmenes persistentes
 volumes:
   mongodb_data:
     driver: local
+
+# Red interna
+networks:
+  llmteachme-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.21.0.0/16
