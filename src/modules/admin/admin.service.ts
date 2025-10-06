@@ -1,4 +1,10 @@
-import { Injectable, NotFoundException, Logger } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  Logger,
+  BadRequestException,
+  ConflictException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import {
@@ -9,10 +15,21 @@ import {
   ChatSession,
   ChatSessionDocument,
 } from '../conversation/schemas/chat-session.schema';
+import {
+  SystemPromptConfig,
+  SystemPromptConfigDocument,
+} from './schemas/system-prompt-config.schema';
 import { PromptService } from '../prompt/prompt.service';
 import { ChatSessionService } from '../conversation/services/chat-session.service';
-import { GeminiService } from '../gemini/gemini.service';
+import { SystemPromptCompilerService } from './services/system-prompt-compiler.service';
+import { SystemPromptCacheService } from './services/system-prompt-cache.service';
 import { CreatePromptTemplateDto } from '../prompt/dto/create-prompt-template.dto';
+import {
+  CreateSystemPromptDto,
+  UpdateSystemPromptDto,
+  SystemPromptResponseDto,
+  PreviewPromptDto,
+} from './dto/system-prompt.dto';
 
 @Injectable()
 export class AdminService {
@@ -23,9 +40,12 @@ export class AdminService {
     private promptTemplateModel: Model<PromptTemplateDocument>,
     @InjectModel(ChatSession.name)
     private chatSessionModel: Model<ChatSessionDocument>,
+    @InjectModel(SystemPromptConfig.name)
+    private systemPromptModel: Model<SystemPromptConfigDocument>,
     private promptService: PromptService,
     private chatSessionService: ChatSessionService,
-    private geminiService: GeminiService,
+    private systemPromptCompiler: SystemPromptCompilerService,
+    private systemPromptCache: SystemPromptCacheService,
   ) {}
 
   // ==================== Prompt Templates CRUD ====================
@@ -201,7 +221,6 @@ export class AdminService {
   async getSystemHealth() {
     const mongoConnected =
       (this.chatSessionModel.db.readyState as number) === 1;
-    const geminiInitialized = this.geminiService.isInitialized();
 
     const totalSessions = await this.chatSessionModel.countDocuments().exec();
 
@@ -216,16 +235,23 @@ export class AdminService {
       .countDocuments()
       .exec();
 
+    const activeSystemPrompt = await this.systemPromptModel
+      .findOne({ isActive: true })
+      .exec();
+
     return {
-      status: mongoConnected && geminiInitialized ? 'healthy' : 'degraded',
+      status: mongoConnected ? 'healthy' : 'degraded',
       services: {
         mongodb: mongoConnected ? 'connected' : 'disconnected',
-        gemini: geminiInitialized ? 'initialized' : 'not initialized',
+        systemPrompt: activeSystemPrompt
+          ? `active (v${activeSystemPrompt.version})`
+          : 'no active prompt',
       },
       database: {
         chatSessions: totalSessions,
         messages: totalMessages,
         promptTemplates: totalTemplates,
+        systemPrompts: await this.systemPromptModel.countDocuments().exec(),
       },
       timestamp: new Date(),
     };
@@ -285,5 +311,254 @@ export class AdminService {
   async deleteChatSession(sessionId: string) {
     await this.chatSessionModel.findByIdAndDelete(sessionId).exec();
     return { message: `Chat session ${sessionId} deleted successfully` };
+  }
+
+  // ==================== System Prompt Management ====================
+
+  /**
+   * Get active system prompt
+   */
+  async getActiveSystemPrompt(): Promise<SystemPromptResponseDto> {
+    const activePrompt = await this.systemPromptModel
+      .findOne({ isActive: true })
+      .exec();
+
+    if (!activePrompt) {
+      throw new NotFoundException(
+        'No active system prompt found. Please activate a configuration.',
+      );
+    }
+
+    return this.mapToResponseDto(activePrompt);
+  }
+
+  /**
+   * Get all system prompt versions
+   */
+  async getSystemPromptVersions(filters?: {
+    isActive?: boolean;
+  }): Promise<SystemPromptResponseDto[]> {
+    const query: any = {};
+
+    if (filters?.isActive !== undefined) {
+      query.isActive = filters.isActive;
+    }
+
+    const prompts = await this.systemPromptModel
+      .find(query)
+      .sort({ createdAt: -1 })
+      .exec();
+
+    return prompts.map((prompt) => this.mapToResponseDto(prompt));
+  }
+
+  /**
+   * Create new system prompt version
+   */
+  async createSystemPrompt(
+    dto: CreateSystemPromptDto,
+    adminId: string,
+  ): Promise<SystemPromptResponseDto> {
+    // Auto-increment version
+    const latestVersion = await this.getLatestVersion();
+    const newVersion = this.incrementVersion(latestVersion);
+
+    // Compile the prompt
+    const compiledPrompt = this.systemPromptCompiler.compile({
+      botName: dto.botName || 'Mr. Butter',
+      personality: dto.personality,
+      correctionStyle: dto.correctionStyle,
+      responseLengthByLevel: dto.responseLengthByLevel,
+      simulationBehavior: dto.simulationBehavior,
+      securityRules: dto.securityRules,
+    });
+
+    // Create new configuration (not active by default)
+    const newPrompt = new this.systemPromptModel({
+      version: newVersion,
+      botName: dto.botName || 'Mr. Butter',
+      personality: dto.personality,
+      correctionStyle: dto.correctionStyle,
+      responseLengthByLevel: dto.responseLengthByLevel,
+      simulationBehavior: dto.simulationBehavior,
+      securityRules: dto.securityRules,
+      compiledPrompt,
+      isActive: false,
+      createdBy: adminId,
+    });
+
+    const saved = await newPrompt.save();
+
+    this.logger.log(
+      `Created new system prompt version ${newVersion} by admin ${adminId}`,
+    );
+
+    return this.mapToResponseDto(saved);
+  }
+
+  /**
+   * Update system prompt (only if not active)
+   */
+  async updateSystemPrompt(
+    id: string,
+    dto: UpdateSystemPromptDto,
+  ): Promise<SystemPromptResponseDto> {
+    const prompt = await this.systemPromptModel.findById(id).exec();
+
+    if (!prompt) {
+      throw new NotFoundException(`System prompt with id ${id} not found`);
+    }
+
+    if (prompt.isActive) {
+      throw new BadRequestException(
+        'Cannot edit an active system prompt. Deactivate it first or create a new version.',
+      );
+    }
+
+    // Update fields
+    if (dto.botName !== undefined) prompt.botName = dto.botName;
+    if (dto.personality !== undefined) prompt.personality = dto.personality;
+    if (dto.correctionStyle !== undefined)
+      prompt.correctionStyle = dto.correctionStyle;
+    if (dto.responseLengthByLevel !== undefined)
+      prompt.responseLengthByLevel = dto.responseLengthByLevel;
+    if (dto.simulationBehavior !== undefined)
+      prompt.simulationBehavior = dto.simulationBehavior;
+    if (dto.securityRules !== undefined)
+      prompt.securityRules = dto.securityRules;
+
+    // Re-compile prompt
+    prompt.compiledPrompt = this.systemPromptCompiler.compile(prompt);
+
+    const updated = await prompt.save();
+
+    this.logger.log(`Updated system prompt version ${prompt.version}`);
+
+    return this.mapToResponseDto(updated);
+  }
+
+  /**
+   * Activate a system prompt version
+   */
+  async activateSystemPrompt(id: string): Promise<SystemPromptResponseDto> {
+    const prompt = await this.systemPromptModel.findById(id).exec();
+
+    if (!prompt) {
+      throw new NotFoundException(`System prompt with id ${id} not found`);
+    }
+
+    if (prompt.isActive) {
+      throw new ConflictException(
+        `System prompt version ${prompt.version} is already active`,
+      );
+    }
+
+    // Deactivate all prompts
+    await this.systemPromptModel
+      .updateMany({ isActive: true }, { isActive: false })
+      .exec();
+
+    // Activate selected prompt
+    prompt.isActive = true;
+    prompt.activatedAt = new Date();
+    const activated = await prompt.save();
+
+    // Invalidate cache
+    this.systemPromptCache.invalidateCache();
+
+    this.logger.log(
+      `Activated system prompt version ${prompt.version}. Cache invalidated.`,
+    );
+
+    return this.mapToResponseDto(activated);
+  }
+
+  /**
+   * Preview compiled prompt without saving
+   */
+  previewSystemPrompt(dto: PreviewPromptDto): { compiledPrompt: string } {
+    const compiledPrompt = this.systemPromptCompiler.compile({
+      botName: dto.botName || 'Mr. Butter',
+      personality: dto.personality,
+      correctionStyle: dto.correctionStyle,
+      responseLengthByLevel: dto.responseLengthByLevel,
+      simulationBehavior: dto.simulationBehavior,
+      securityRules: dto.securityRules,
+    });
+
+    return { compiledPrompt };
+  }
+
+  /**
+   * Delete a system prompt version (only if not active)
+   */
+  async deleteSystemPrompt(id: string): Promise<{ message: string }> {
+    const prompt = await this.systemPromptModel.findById(id).exec();
+
+    if (!prompt) {
+      throw new NotFoundException(`System prompt with id ${id} not found`);
+    }
+
+    if (prompt.isActive) {
+      throw new BadRequestException(
+        'Cannot delete an active system prompt. Activate another version first.',
+      );
+    }
+
+    await this.systemPromptModel.findByIdAndDelete(id).exec();
+
+    this.logger.log(`Deleted system prompt version ${prompt.version}`);
+
+    return {
+      message: `System prompt version ${prompt.version} deleted successfully`,
+    };
+  }
+
+  // ==================== Private Helper Methods ====================
+
+  /**
+   * Get latest version number
+   */
+  private async getLatestVersion(): Promise<string> {
+    const latestPrompt = await this.systemPromptModel
+      .findOne()
+      .sort({ version: -1 })
+      .exec();
+
+    return latestPrompt ? latestPrompt.version : '0.0';
+  }
+
+  /**
+   * Increment version number (e.g., "1.2" -> "1.3")
+   */
+  private incrementVersion(currentVersion: string): string {
+    const parts = currentVersion.split('.');
+    const major = parseInt(parts[0]) || 0;
+    const minor = parseInt(parts[1]) || 0;
+
+    return `${major}.${minor + 1}`;
+  }
+
+  /**
+   * Map document to response DTO
+   */
+  private mapToResponseDto(
+    doc: SystemPromptConfigDocument,
+  ): SystemPromptResponseDto {
+    return {
+      id: (doc._id as any).toString(),
+      version: doc.version,
+      botName: doc.botName,
+      personality: doc.personality as any,
+      correctionStyle: doc.correctionStyle as any,
+      responseLengthByLevel: doc.responseLengthByLevel as any,
+      simulationBehavior: doc.simulationBehavior as any,
+      securityRules: doc.securityRules,
+      compiledPrompt: doc.compiledPrompt,
+      isActive: doc.isActive,
+      createdBy: doc.createdBy.toString(),
+      createdAt: (doc as any).createdAt,
+      activatedAt: doc.activatedAt,
+    };
   }
 }

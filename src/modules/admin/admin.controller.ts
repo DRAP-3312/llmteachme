@@ -8,6 +8,7 @@ import {
   Param,
   Query,
   UseGuards,
+  Patch,
 } from '@nestjs/common';
 import {
   ApiTags,
@@ -19,9 +20,16 @@ import {
 } from '@nestjs/swagger';
 import { AdminService } from './admin.service';
 import { CreatePromptTemplateDto } from '../prompt/dto/create-prompt-template.dto';
+import {
+  CreateSystemPromptDto,
+  UpdateSystemPromptDto,
+  SystemPromptResponseDto,
+  PreviewPromptDto,
+} from './dto/system-prompt.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 import { RolesGuard } from '../auth/guards/roles.guard';
 import { Roles } from '../auth/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 
 @ApiTags('admin')
 @ApiBearerAuth('JWT-auth')
@@ -358,5 +366,170 @@ export class AdminController {
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })
   async deleteChatSession(@Param('id') id: string) {
     return this.adminService.deleteChatSession(id);
+  }
+
+  // ==================== System Prompt Management ====================
+
+  @Get('system-prompt/active')
+  @ApiOperation({
+    summary: 'Get active system prompt',
+    description: 'Retrieve the currently active system prompt configuration',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Active system prompt retrieved successfully',
+    type: SystemPromptResponseDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'No active system prompt found',
+  })
+  async getActiveSystemPrompt() {
+    return this.adminService.getActiveSystemPrompt();
+  }
+
+  @Get('system-prompt/versions')
+  @ApiOperation({
+    summary: 'Get all system prompt versions',
+    description: 'Retrieve all system prompt configurations (history)',
+  })
+  @ApiQuery({
+    name: 'isActive',
+    required: false,
+    type: Boolean,
+    description: 'Filter by active status',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'System prompt versions retrieved successfully',
+    type: [SystemPromptResponseDto],
+  })
+  async getSystemPromptVersions(@Query('isActive') isActive?: string) {
+    const filters =
+      isActive !== undefined ? { isActive: isActive === 'true' } : undefined;
+    return this.adminService.getSystemPromptVersions(filters);
+  }
+
+  @Post('system-prompt')
+  @ApiOperation({
+    summary: 'Create new system prompt version',
+    description:
+      'Create a new system prompt configuration (inactive by default)',
+  })
+  @ApiResponse({
+    status: 201,
+    description: 'System prompt created successfully',
+    type: SystemPromptResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Validation error',
+  })
+  async createSystemPrompt(
+    @Body() dto: CreateSystemPromptDto,
+    @CurrentUser('userId') adminId: string,
+  ) {
+    return this.adminService.createSystemPrompt(dto, adminId);
+  }
+
+  @Patch('system-prompt/:id')
+  @ApiOperation({
+    summary: 'Update system prompt',
+    description: 'Update a system prompt configuration (only if not active)',
+  })
+  @ApiParam({ name: 'id', description: 'System prompt ID' })
+  @ApiResponse({
+    status: 200,
+    description: 'System prompt updated successfully',
+    type: SystemPromptResponseDto,
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot edit active prompt',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'System prompt not found',
+  })
+  async updateSystemPrompt(
+    @Param('id') id: string,
+    @Body() dto: UpdateSystemPromptDto,
+  ) {
+    return this.adminService.updateSystemPrompt(id, dto);
+  }
+
+  @Post('system-prompt/:id/activate')
+  @ApiOperation({
+    summary: 'Activate system prompt',
+    description:
+      'Activate a system prompt version (deactivates current active prompt)',
+  })
+  @ApiParam({ name: 'id', description: 'System prompt ID to activate' })
+  @ApiResponse({
+    status: 200,
+    description: 'System prompt activated successfully',
+    type: SystemPromptResponseDto,
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'System prompt not found',
+  })
+  @ApiResponse({
+    status: 409,
+    description: 'System prompt already active',
+  })
+  async activateSystemPrompt(@Param('id') id: string) {
+    return this.adminService.activateSystemPrompt(id);
+  }
+
+  @Post('system-prompt/preview')
+  @ApiOperation({
+    summary: 'Preview system prompt',
+    description: 'Generate a preview of the compiled prompt without saving',
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Preview generated successfully',
+    schema: {
+      properties: {
+        compiledPrompt: {
+          type: 'string',
+          example: 'You are Mr. Butter, a friendly English teacher...',
+        },
+      },
+    },
+  })
+  previewSystemPrompt(@Body() dto: PreviewPromptDto) {
+    return this.adminService.previewSystemPrompt(dto);
+  }
+
+  @Delete('system-prompt/:id')
+  @ApiOperation({
+    summary: 'Delete system prompt',
+    description: 'Delete a system prompt version (only if not active)',
+  })
+  @ApiParam({ name: 'id', description: 'System prompt ID to delete' })
+  @ApiResponse({
+    status: 200,
+    description: 'System prompt deleted successfully',
+    schema: {
+      properties: {
+        message: {
+          type: 'string',
+          example: 'System prompt version 1.2 deleted successfully',
+        },
+      },
+    },
+  })
+  @ApiResponse({
+    status: 400,
+    description: 'Cannot delete active prompt',
+  })
+  @ApiResponse({
+    status: 404,
+    description: 'System prompt not found',
+  })
+  async deleteSystemPrompt(@Param('id') id: string) {
+    return this.adminService.deleteSystemPrompt(id);
   }
 }
