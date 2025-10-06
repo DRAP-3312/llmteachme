@@ -14,6 +14,7 @@ import {
 } from './schemas/security-event.schema';
 import { PromptModule } from '../prompt/prompt.module';
 import { AIProviderModule } from '../../shared/providers/ai';
+import { AuthModule } from '../auth/auth.module';
 import { TopicService } from './services/topic.service';
 import { TemplateSimulatorService } from './services/template-simulator.service';
 import { ChatSessionService } from './services/chat-session.service';
@@ -29,6 +30,7 @@ import { SecurityEventService } from './services/security-event.service';
     ]),
     PromptModule,
     AIProviderModule,
+    AuthModule,
   ],
   controllers: [ChatController],
   providers: [

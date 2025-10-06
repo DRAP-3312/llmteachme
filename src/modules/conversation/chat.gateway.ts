@@ -8,24 +8,22 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger, Inject } from '@nestjs/common';
+import { Logger, Inject, UseGuards } from '@nestjs/common';
 import { ChatSessionService } from './services/chat-session.service';
 import type { IAIProvider } from '../../shared/providers/ai';
-
-interface RegisterPayload {
-  userId: string;
-  token: string; // JWT token
-}
+import { WsJwtGuard } from './guards/ws-jwt.guard';
+import { AudioValidator } from './helpers/audio-validator.helper';
 
 interface UserMessagePayload {
-  userId: string;
   sessionId: string;
-  text: string;
-  audioUrl?: string;
+  text?: string;
+  audio?: {
+    data: string; // base64 encoded audio
+    mimeType: string;
+  };
 }
 
 interface EndSessionPayload {
-  userId: string;
   sessionId: string;
 }
 
@@ -36,12 +34,12 @@ interface EndSessionPayload {
   },
   namespace: '/chat',
 })
+@UseGuards(WsJwtGuard)
 export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   @WebSocketServer()
   server: Server;
 
   private readonly logger = new Logger(ChatGateway.name);
-  private userSockets = new Map<string, string>(); // userId -> socketId
 
   constructor(
     private chatSessionService: ChatSessionService,
@@ -49,48 +47,34 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
   ) {}
 
   /**
-   * Handle client connection
+   * Handle client connection (after JWT validation by WsJwtGuard)
    */
   handleConnection(client: Socket) {
-    this.logger.log(`Client connected: ${client.id}`);
+    const userId = (client as any).user?.userId;
+    this.logger.log(
+      `Client connected: socketId=${client.id}, userId=${userId}`,
+    );
+
+    // Emit connection success
+    client.emit('connected', {
+      success: true,
+      userId,
+      socketId: client.id,
+    });
   }
 
   /**
    * Handle client disconnect
    */
   handleDisconnect(client: Socket) {
-    this.logger.log(`Client disconnected: ${client.id}`);
-
-    // Remove from user sockets map
-    for (const [userId, socketId] of this.userSockets.entries()) {
-      if (socketId === client.id) {
-        this.userSockets.delete(userId);
-        break;
-      }
-    }
+    const userId = (client as any).user?.userId;
+    this.logger.log(
+      `Client disconnected: socketId=${client.id}, userId=${userId}`,
+    );
   }
 
   /**
-   * Register user to WebSocket
-   */
-  @SubscribeMessage('register')
-  handleRegister(
-    @ConnectedSocket() client: Socket,
-    @MessageBody() data: RegisterPayload,
-  ) {
-    // TODO: Validate JWT token
-
-    this.userSockets.set(data.userId, client.id);
-    this.logger.log(`User ${data.userId} registered to socket ${client.id}`);
-
-    client.emit('registered', {
-      success: true,
-      userId: data.userId,
-    });
-  }
-
-  /**
-   * Handle user message
+   * Handle user message (text or audio)
    */
   @SubscribeMessage('user_message')
   async handleUserMessage(
@@ -98,13 +82,35 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: UserMessagePayload,
   ) {
     try {
-      const { userId, sessionId, text } = data;
+      const userId = (client as any).user?.userId;
+      const { sessionId, text, audio } = data;
+
+      // Validate session ownership
+      await this.validateSessionOwnership(sessionId, userId);
+
+      let userText: string;
+
+      // Process audio if provided
+      if (audio) {
+        this.logger.debug(`Processing audio message for session ${sessionId}`);
+
+        // Validate and transcribe audio
+        userText = await this.processAudio(audio.data, audio.mimeType);
+
+        this.logger.debug(
+          `Transcribed audio: ${userText.substring(0, 100)}...`,
+        );
+      } else if (text) {
+        userText = text;
+      } else {
+        throw new Error('Either text or audio must be provided');
+      }
 
       // Check prompt injection
       const injectionCheck = await this.chatSessionService.checkPromptInjection(
         sessionId,
         userId,
-        text,
+        userText,
       );
 
       if (!injectionCheck.isSafe) {
@@ -119,7 +125,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       await this.chatSessionService.addMessage({
         sessionId,
         role: 'user',
-        text,
+        text: userText,
         isContextMessage: false,
       });
 
@@ -178,6 +184,12 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         message: 'Error processing your message',
         error: error.message,
       });
+
+      // Stop typing indicator on error
+      client.emit('assistant_typing', {
+        sessionId: data.sessionId,
+        isTyping: false,
+      });
     }
   }
 
@@ -190,19 +202,44 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     @MessageBody() data: EndSessionPayload,
   ) {
     try {
-      const { userId, sessionId } = data;
+      const userId = (client as any).user?.userId;
+      const { sessionId } = data;
 
-      // TODO: Generate summary using AI
+      // Validate session ownership
+      await this.validateSessionOwnership(sessionId, userId);
 
-      const session = await this.chatSessionService.endSession({
+      // Get session for summary generation
+      const session = await this.chatSessionService.findById(sessionId);
+
+      // Map messages for AI summary
+      const mappedMessages = session.messages
+        .filter((msg) => !msg.isContextMessage)
+        .map((msg) => ({
+          role: msg.role as 'user' | 'model',
+          text: msg.text,
+          timestamp: msg.timestamp,
+          isContextMessage: msg.isContextMessage,
+        }));
+
+      // Generate summary using AI
+      let summary = 'Session ended';
+      try {
+        summary = await this.aiProvider.generateSummary(mappedMessages);
+      } catch (error) {
+        this.logger.error(`Error generating summary: ${error.message}`);
+        summary = 'Session completed';
+      }
+
+      // End session with summary
+      const endedSession = await this.chatSessionService.endSession({
         sessionId,
-        summary: 'Session ended by user',
+        summary,
       });
 
       client.emit('session_ended', {
         sessionId,
-        summary: session.summary,
-        metrics: session.metrics,
+        summary: endedSession.summary,
+        metrics: endedSession.metrics,
       });
 
       this.logger.log(`Session ${sessionId} ended by user ${userId}`);
@@ -213,5 +250,49 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
         error: error.message,
       });
     }
+  }
+
+  // ==================== Helper Methods ====================
+
+  /**
+   * Validate that the user owns the session
+   */
+  private async validateSessionOwnership(
+    sessionId: string,
+    userId: string,
+  ): Promise<void> {
+    const session = await this.chatSessionService.findById(sessionId);
+
+    if (session.userId.toString() !== userId) {
+      throw new Error(
+        `Unauthorized: User ${userId} does not own session ${sessionId}`,
+      );
+    }
+  }
+
+  /**
+   * Process audio: validate and transcribe
+   */
+  private async processAudio(
+    audioBase64: string,
+    mimeType: string,
+  ): Promise<string> {
+    // Decode base64 to buffer
+    const audioBuffer = Buffer.from(audioBase64, 'base64');
+
+    // Validate audio
+    AudioValidator.validate(audioBuffer, mimeType);
+
+    // Transcribe using AI provider
+    const transcription = await this.aiProvider.transcribeAudio(
+      audioBuffer,
+      mimeType,
+    );
+
+    if (!transcription || transcription.trim().length === 0) {
+      throw new Error('Audio transcription resulted in empty text');
+    }
+
+    return transcription;
   }
 }
