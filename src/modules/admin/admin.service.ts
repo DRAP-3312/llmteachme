@@ -19,6 +19,11 @@ import {
   SystemPromptConfig,
   SystemPromptConfigDocument,
 } from './schemas/system-prompt-config.schema';
+import { Topic, TopicDocument } from '../conversation/schemas/topic.schema';
+import {
+  TemplateSimulator,
+  TemplateSimulatorDocument,
+} from '../conversation/schemas/template-simulator.schema';
 import { PromptService } from '../prompt/prompt.service';
 import { ChatSessionService } from '../conversation/services/chat-session.service';
 import { SystemPromptCompilerService } from './services/system-prompt-compiler.service';
@@ -30,6 +35,16 @@ import {
   SystemPromptResponseDto,
   PreviewPromptDto,
 } from './dto/system-prompt.dto';
+import {
+  CreateTopicDto,
+  UpdateTopicDto,
+  TopicResponseDto,
+} from './dto/topic.dto';
+import {
+  CreateTemplateDto,
+  UpdateTemplateDto,
+  TemplateResponseDto,
+} from './dto/template.dto';
 
 @Injectable()
 export class AdminService {
@@ -42,6 +57,10 @@ export class AdminService {
     private chatSessionModel: Model<ChatSessionDocument>,
     @InjectModel(SystemPromptConfig.name)
     private systemPromptModel: Model<SystemPromptConfigDocument>,
+    @InjectModel(Topic.name)
+    private topicModel: Model<TopicDocument>,
+    @InjectModel(TemplateSimulator.name)
+    private templateSimulatorModel: Model<TemplateSimulatorDocument>,
     private promptService: PromptService,
     private chatSessionService: ChatSessionService,
     private systemPromptCompiler: SystemPromptCompilerService,
@@ -559,6 +578,264 @@ export class AdminService {
       createdBy: doc.createdBy.toString(),
       createdAt: (doc as any).createdAt,
       activatedAt: doc.activatedAt,
+    };
+  }
+
+  // ==================== Topics Management ====================
+
+  /**
+   * Get all topics
+   */
+  async getAllTopics(): Promise<TopicResponseDto[]> {
+    const topics = await this.topicModel.find().sort({ name: 1 }).exec();
+    return topics.map((topic) => this.mapTopicToDto(topic));
+  }
+
+  /**
+   * Get topic by ID
+   */
+  async getTopicById(id: string): Promise<TopicResponseDto> {
+    const topic = await this.topicModel.findById(id).exec();
+    if (!topic) {
+      throw new NotFoundException(`Topic with id ${id} not found`);
+    }
+    return this.mapTopicToDto(topic);
+  }
+
+  /**
+   * Create new topic
+   */
+  async createTopic(
+    dto: CreateTopicDto,
+    adminId: string,
+  ): Promise<TopicResponseDto> {
+    // Check if topic with same name exists
+    const existing = await this.topicModel.findOne({ name: dto.name }).exec();
+    if (existing) {
+      throw new ConflictException(
+        `Topic with name '${dto.name}' already exists`,
+      );
+    }
+
+    const newTopic = new this.topicModel({
+      name: dto.name,
+      description: dto.description,
+      isActive: dto.isActive ?? true,
+      createdBy: adminId,
+    });
+
+    const saved = await newTopic.save();
+    this.logger.log(`Created topic '${dto.name}' by admin ${adminId}`);
+
+    return this.mapTopicToDto(saved);
+  }
+
+  /**
+   * Update topic
+   */
+  async updateTopic(
+    id: string,
+    dto: UpdateTopicDto,
+  ): Promise<TopicResponseDto> {
+    const topic = await this.topicModel.findById(id).exec();
+    if (!topic) {
+      throw new NotFoundException(`Topic with id ${id} not found`);
+    }
+
+    // Check name uniqueness if changing name
+    if (dto.name && dto.name !== topic.name) {
+      const existing = await this.topicModel.findOne({ name: dto.name }).exec();
+      if (existing) {
+        throw new ConflictException(
+          `Topic with name '${dto.name}' already exists`,
+        );
+      }
+    }
+
+    if (dto.name !== undefined) topic.name = dto.name;
+    if (dto.description !== undefined) topic.description = dto.description;
+    if (dto.isActive !== undefined) topic.isActive = dto.isActive;
+
+    const updated = await topic.save();
+    this.logger.log(`Updated topic ${id}`);
+
+    return this.mapTopicToDto(updated);
+  }
+
+  /**
+   * Delete topic
+   */
+  async deleteTopic(id: string): Promise<{ message: string }> {
+    const topic = await this.topicModel.findById(id).exec();
+    if (!topic) {
+      throw new NotFoundException(`Topic with id ${id} not found`);
+    }
+
+    // Check if there are templates using this topic
+    const templatesCount = await this.templateSimulatorModel
+      .countDocuments({ topicId: id })
+      .exec();
+
+    if (templatesCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete topic: ${templatesCount} template(s) are using this topic`,
+      );
+    }
+
+    await this.topicModel.findByIdAndDelete(id).exec();
+    this.logger.log(`Deleted topic '${topic.name}'`);
+
+    return { message: `Topic '${topic.name}' deleted successfully` };
+  }
+
+  /**
+   * Map Topic document to DTO
+   */
+  private mapTopicToDto(doc: TopicDocument): TopicResponseDto {
+    return {
+      id: (doc._id as any).toString(),
+      name: doc.name,
+      description: doc.description,
+      isActive: doc.isActive,
+      createdBy: doc.createdBy.toString(),
+      createdAt: (doc as any).createdAt,
+      updatedAt: (doc as any).updatedAt,
+    };
+  }
+
+  // ==================== Templates Management ====================
+
+  /**
+   * Get all templates
+   */
+  async getAllTemplateSimulators(): Promise<TemplateResponseDto[]> {
+    const templates = await this.templateSimulatorModel
+      .find()
+      .populate('topicId')
+      .sort({ title: 1 })
+      .exec();
+
+    return templates.map((template) => this.mapTemplateToDto(template));
+  }
+
+  /**
+   * Get template by ID
+   */
+  async getTemplateSimulatorById(id: string): Promise<TemplateResponseDto> {
+    const template = await this.templateSimulatorModel
+      .findById(id)
+      .populate('topicId')
+      .exec();
+
+    if (!template) {
+      throw new NotFoundException(`Template with id ${id} not found`);
+    }
+
+    return this.mapTemplateToDto(template);
+  }
+
+  /**
+   * Create new template
+   */
+  async createTemplateSimulator(
+    dto: CreateTemplateDto,
+    adminId: string,
+  ): Promise<TemplateResponseDto> {
+    // Verify topic exists
+    const topic = await this.topicModel.findById(dto.topicId).exec();
+    if (!topic) {
+      throw new NotFoundException(`Topic with id ${dto.topicId} not found`);
+    }
+
+    const newTemplate = new this.templateSimulatorModel({
+      title: dto.title,
+      description: dto.description,
+      topicId: dto.topicId,
+      scope: dto.scope,
+      isActive: dto.isActive ?? true,
+      createdBy: adminId,
+    });
+
+    const saved = await newTemplate.save();
+    this.logger.log(`Created template '${dto.title}' by admin ${adminId}`);
+
+    return this.mapTemplateToDto(await saved.populate('topicId'));
+  }
+
+  /**
+   * Update template
+   */
+  async updateTemplateSimulator(
+    id: string,
+    dto: UpdateTemplateDto,
+  ): Promise<TemplateResponseDto> {
+    const template = await this.templateSimulatorModel.findById(id).exec();
+    if (!template) {
+      throw new NotFoundException(`Template with id ${id} not found`);
+    }
+
+    // Verify topic exists if changing topicId
+    if (dto.topicId) {
+      const topic = await this.topicModel.findById(dto.topicId).exec();
+      if (!topic) {
+        throw new NotFoundException(`Topic with id ${dto.topicId} not found`);
+      }
+    }
+
+    if (dto.title !== undefined) template.title = dto.title;
+    if (dto.description !== undefined) template.description = dto.description;
+    if (dto.topicId !== undefined) template.topicId = dto.topicId as any;
+    if (dto.scope !== undefined) template.scope = dto.scope;
+    if (dto.isActive !== undefined) template.isActive = dto.isActive;
+
+    const updated = await template.save();
+    this.logger.log(`Updated template ${id}`);
+
+    return this.mapTemplateToDto(await updated.populate('topicId'));
+  }
+
+  /**
+   * Delete template
+   */
+  async deleteTemplateSimulator(id: string): Promise<{ message: string }> {
+    const template = await this.templateSimulatorModel.findById(id).exec();
+    if (!template) {
+      throw new NotFoundException(`Template with id ${id} not found`);
+    }
+
+    // Check if there are active sessions using this template
+    const sessionsCount = await this.chatSessionModel
+      .countDocuments({ templateId: id, isActive: true })
+      .exec();
+
+    if (sessionsCount > 0) {
+      throw new BadRequestException(
+        `Cannot delete template: ${sessionsCount} active session(s) are using this template`,
+      );
+    }
+
+    await this.templateSimulatorModel.findByIdAndDelete(id).exec();
+    this.logger.log(`Deleted template '${template.title}'`);
+
+    return { message: `Template '${template.title}' deleted successfully` };
+  }
+
+  /**
+   * Map TemplateSimulator document to DTO
+   */
+  private mapTemplateToDto(
+    doc: TemplateSimulatorDocument,
+  ): TemplateResponseDto {
+    return {
+      id: (doc._id as any).toString(),
+      title: doc.title,
+      description: doc.description,
+      topicId: doc.topicId.toString(),
+      scope: doc.scope,
+      createdBy: doc.createdBy.toString(),
+      isActive: doc.isActive,
+      createdAt: (doc as any).createdAt,
+      updatedAt: (doc as any).updatedAt,
     };
   }
 }

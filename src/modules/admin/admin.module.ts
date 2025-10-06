@@ -14,6 +14,11 @@ import {
   SystemPromptConfig,
   SystemPromptConfigSchema,
 } from './schemas/system-prompt-config.schema';
+import { Topic, TopicSchema } from '../conversation/schemas/topic.schema';
+import {
+  TemplateSimulator,
+  TemplateSimulatorSchema,
+} from '../conversation/schemas/template-simulator.schema';
 import { PromptModule } from '../prompt/prompt.module';
 import { ConversationModule } from '../conversation/conversation.module';
 import { SystemPromptCompilerService } from './services/system-prompt-compiler.service';
@@ -25,6 +30,8 @@ import { SystemPromptCacheService } from './services/system-prompt-cache.service
       { name: PromptTemplate.name, schema: PromptTemplateSchema },
       { name: ChatSession.name, schema: ChatSessionSchema },
       { name: SystemPromptConfig.name, schema: SystemPromptConfigSchema },
+      { name: Topic.name, schema: TopicSchema },
+      { name: TemplateSimulator.name, schema: TemplateSimulatorSchema },
     ]),
     PromptModule,
     ConversationModule,
