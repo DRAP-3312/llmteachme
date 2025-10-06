@@ -13,7 +13,7 @@ import {
   SecurityEventSchema,
 } from './schemas/security-event.schema';
 import { PromptModule } from '../prompt/prompt.module';
-import { GeminiModule } from '../gemini/gemini.module';
+import { AIProviderModule } from '../../shared/providers/ai';
 import { TopicService } from './services/topic.service';
 import { TemplateSimulatorService } from './services/template-simulator.service';
 import { ChatSessionService } from './services/chat-session.service';
@@ -28,7 +28,7 @@ import { SecurityEventService } from './services/security-event.service';
       { name: SecurityEvent.name, schema: SecurityEventSchema },
     ]),
     PromptModule,
-    GeminiModule,
+    AIProviderModule,
   ],
   controllers: [ChatController],
   providers: [

@@ -2,7 +2,6 @@ import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { ConversationModule } from './modules/conversation/conversation.module';
-import { GeminiModule } from './modules/gemini/gemini.module';
 import { PromptModule } from './modules/prompt/prompt.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { UserModule } from './modules/user/user.module';
@@ -25,8 +24,6 @@ import { HealthModule } from './health/health.module';
     }),
 
     ConversationModule,
-
-    GeminiModule,
 
     PromptModule,
 

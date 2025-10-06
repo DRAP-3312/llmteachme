@@ -8,10 +8,9 @@ import {
   MessageBody,
 } from '@nestjs/websockets';
 import { Server, Socket } from 'socket.io';
-import { Logger } from '@nestjs/common';
+import { Logger, Inject } from '@nestjs/common';
 import { ChatSessionService } from './services/chat-session.service';
-import { GeminiService } from '../gemini/gemini.service';
-import { GeminiMessage } from '../../common/interfaces/gemini.interface';
+import type { IAIProvider } from '../../shared/providers/ai';
 
 interface RegisterPayload {
   userId: string;
@@ -46,7 +45,7 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   constructor(
     private chatSessionService: ChatSessionService,
-    private geminiService: GeminiService,
+    @Inject('IAIProvider') private aiProvider: IAIProvider,
   ) {}
 
   /**
@@ -133,30 +132,35 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
       // Get session to build context
       const session = await this.chatSessionService.findById(sessionId);
 
-      // Generate AI response
-      // TODO: Use proper system prompt and template instructions
-      const messages: GeminiMessage[] = session.messages.map((msg) => ({
-        role: msg.role === 'user' ? 'user' : 'model',
-        parts: [{ text: msg.text }],
+      // Map messages to IAIProvider Message type
+      const mappedMessages = session.messages.map((msg) => ({
+        role: msg.role as 'user' | 'model',
+        text: msg.text,
+        timestamp: msg.timestamp,
+        isContextMessage: msg.isContextMessage,
       }));
 
-      const aiResponse = await this.geminiService.generateResponse(
-        messages,
-        'You are a helpful English tutor.',
+      // Generate AI response
+      // TODO: Use proper system prompt and template instructions
+      const aiResponse = await this.aiProvider.generateResponse(
+        'You are a helpful English tutor.', // TODO: Get from SystemPromptCache
+        'Practice conversation', // TODO: Get from TemplateSimulator
+        'Student context', // TODO: Build user context
+        mappedMessages,
       );
 
       // Add AI message to session
       await this.chatSessionService.addMessage({
         sessionId,
         role: 'model',
-        text: aiResponse.text,
+        text: aiResponse,
         isContextMessage: false,
       });
 
       // Emit AI response
       client.emit('ai_response', {
         sessionId,
-        text: aiResponse.text,
+        text: aiResponse,
         timestamp: new Date(),
       });
 
