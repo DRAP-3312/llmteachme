@@ -6,15 +6,11 @@ import {
   PromptTemplateDocument,
 } from '../prompt/schemas/prompt-template.schema';
 import {
-  Conversation,
-  ConversationDocument,
-} from '../conversation/schemas/conversation.schema';
-import {
-  Message,
-  MessageDocument,
-} from '../conversation/schemas/message.schema';
+  ChatSession,
+  ChatSessionDocument,
+} from '../conversation/schemas/chat-session.schema';
 import { PromptService } from '../prompt/prompt.service';
-import { ConversationService } from '../conversation/conversation.service';
+import { ChatSessionService } from '../conversation/services/chat-session.service';
 import { GeminiService } from '../gemini/gemini.service';
 import { CreatePromptTemplateDto } from '../prompt/dto/create-prompt-template.dto';
 
@@ -25,12 +21,10 @@ export class AdminService {
   constructor(
     @InjectModel(PromptTemplate.name)
     private promptTemplateModel: Model<PromptTemplateDocument>,
-    @InjectModel(Conversation.name)
-    private conversationModel: Model<ConversationDocument>,
-    @InjectModel(Message.name)
-    private messageModel: Model<MessageDocument>,
+    @InjectModel(ChatSession.name)
+    private chatSessionModel: Model<ChatSessionDocument>,
     private promptService: PromptService,
-    private conversationService: ConversationService,
+    private chatSessionService: ChatSessionService,
     private geminiService: GeminiService,
   ) {}
 
@@ -101,36 +95,27 @@ export class AdminService {
     }
 
     if (filters.startDate || filters.endDate) {
-      query.createdAt = {};
+      query.startedAt = {};
       if (filters.startDate) {
-        query.createdAt.$gte = filters.startDate;
+        query.startedAt.$gte = filters.startDate;
       }
       if (filters.endDate) {
-        query.createdAt.$lte = filters.endDate;
+        query.startedAt.$lte = filters.endDate;
       }
     }
 
-    const total = await this.conversationModel.countDocuments(query).exec();
-    const active = await this.conversationModel
+    const total = await this.chatSessionModel.countDocuments(query).exec();
+    const active = await this.chatSessionModel
       .countDocuments({ ...query, isActive: true })
       .exec();
-    const ended = await this.conversationModel
+    const ended = await this.chatSessionModel
       .countDocuments({ ...query, isActive: false })
       .exec();
-
-    const conversationsByType = await this.conversationModel.aggregate([
-      { $match: query },
-      { $group: { _id: '$conversationType', count: { $sum: 1 } } },
-    ]);
 
     return {
       total,
       active,
       ended,
-      byType: conversationsByType.reduce((acc, item) => {
-        acc[item._id] = item.count;
-        return acc;
-      }, {}),
     };
   }
 
@@ -141,71 +126,67 @@ export class AdminService {
   }) {
     const query: any = {};
 
+    if (filters.userId) {
+      query.userId = filters.userId;
+    }
+
     if (filters.startDate || filters.endDate) {
-      query.createdAt = {};
+      query.startedAt = {};
       if (filters.startDate) {
-        query.createdAt.$gte = filters.startDate;
+        query.startedAt.$gte = filters.startDate;
       }
       if (filters.endDate) {
-        query.createdAt.$lte = filters.endDate;
+        query.startedAt.$lte = filters.endDate;
       }
     }
 
-    // If userId filter, need to join with conversations
-    let totalMessages;
-    let messagesByRole;
+    const result = await this.chatSessionModel.aggregate([
+      { $match: query },
+      { $unwind: '$messages' },
+      {
+        $group: {
+          _id: '$messages.role',
+          count: { $sum: 1 },
+        },
+      },
+    ]);
 
-    if (filters.userId) {
-      const conversations = await this.conversationModel
-        .find({ userId: filters.userId })
-        .select('_id')
-        .exec();
-      const conversationIds = conversations.map((c) => c._id);
-
-      query.conversationId = { $in: conversationIds };
-
-      totalMessages = await this.messageModel.countDocuments(query).exec();
-      messagesByRole = await this.messageModel.aggregate([
-        { $match: query },
-        { $group: { _id: '$role', count: { $sum: 1 } } },
-      ]);
-    } else {
-      totalMessages = await this.messageModel.countDocuments(query).exec();
-      messagesByRole = await this.messageModel.aggregate([
-        { $match: query },
-        { $group: { _id: '$role', count: { $sum: 1 } } },
-      ]);
-    }
+    const total = result.reduce((sum, item) => sum + item.count, 0);
 
     return {
-      total: totalMessages,
-      byRole: messagesByRole.reduce((acc, item) => {
-        acc[item._id] = item.count;
-        return acc;
-      }, {}),
+      total,
+      byRole: result.reduce(
+        (acc, item) => {
+          acc[item._id] = item.count;
+          return acc;
+        },
+        {} as Record<string, number>,
+      ),
     };
   }
 
   async getUserStats() {
-    const uniqueUsers = await this.conversationModel.distinct('userId').exec();
+    const uniqueUsers = await this.chatSessionModel.distinct('userId').exec();
 
     const userActivity = await Promise.all(
       uniqueUsers.slice(0, 100).map(async (userId) => {
-        const conversationCount = await this.conversationModel
+        const sessionCount = await this.chatSessionModel
           .countDocuments({ userId })
           .exec();
-        const conversations = await this.conversationModel
+
+        const sessions = await this.chatSessionModel
           .find({ userId })
-          .select('_id')
+          .select('messages')
           .exec();
-        const conversationIds = conversations.map((c) => c._id);
-        const messageCount = await this.messageModel
-          .countDocuments({ conversationId: { $in: conversationIds } })
-          .exec();
+
+        const messageCount = sessions.reduce(
+          (sum, session) => sum + session.messages.length,
+          0,
+        );
 
         return {
           userId,
-          conversationCount,
+          sessionCount,
           messageCount,
         };
       }),
@@ -219,13 +200,18 @@ export class AdminService {
 
   async getSystemHealth() {
     const mongoConnected =
-      (this.conversationModel.db.readyState as number) === 1;
+      (this.chatSessionModel.db.readyState as number) === 1;
     const geminiInitialized = this.geminiService.isInitialized();
 
-    const totalConversations = await this.conversationModel
-      .countDocuments()
-      .exec();
-    const totalMessages = await this.messageModel.countDocuments().exec();
+    const totalSessions = await this.chatSessionModel.countDocuments().exec();
+
+    const messageStats = await this.chatSessionModel.aggregate([
+      { $unwind: '$messages' },
+      { $count: 'total' },
+    ]);
+
+    const totalMessages = messageStats.length > 0 ? messageStats[0].total : 0;
+
     const totalTemplates = await this.promptTemplateModel
       .countDocuments()
       .exec();
@@ -237,7 +223,7 @@ export class AdminService {
         gemini: geminiInitialized ? 'initialized' : 'not initialized',
       },
       database: {
-        conversations: totalConversations,
+        chatSessions: totalSessions,
         messages: totalMessages,
         promptTemplates: totalTemplates,
       },
@@ -245,9 +231,9 @@ export class AdminService {
     };
   }
 
-  // ==================== Conversations Management ====================
+  // ==================== Chat Sessions Management ====================
 
-  async getConversations(filters: {
+  async getChatSessions(filters: {
     userId?: string;
     isActive?: boolean;
     page?: number;
@@ -267,16 +253,17 @@ export class AdminService {
     const limit = filters.limit || 20;
     const skip = (page - 1) * limit;
 
-    const total = await this.conversationModel.countDocuments(query).exec();
-    const conversations = await this.conversationModel
+    const total = await this.chatSessionModel.countDocuments(query).exec();
+    const sessions = await this.chatSessionModel
       .find(query)
-      .sort({ createdAt: -1 })
+      .sort({ startedAt: -1 })
       .skip(skip)
       .limit(limit)
+      .populate('templateId')
       .exec();
 
     return {
-      data: conversations,
+      data: sessions,
       pagination: {
         total,
         page,
@@ -286,21 +273,17 @@ export class AdminService {
     };
   }
 
-  async getConversationDetails(conversationId: string) {
-    const conversation =
-      await this.conversationService.getConversation(conversationId);
-    const messages =
-      await this.conversationService.getConversationMessages(conversationId);
+  async getChatSessionDetails(sessionId: string) {
+    const session = await this.chatSessionService.findById(sessionId);
 
     return {
-      conversation,
-      messages,
-      messageCount: messages.length,
+      session,
+      messageCount: session.messages.length,
     };
   }
 
-  async deleteConversation(conversationId: string) {
-    await this.conversationService.deleteConversation(conversationId);
-    return { message: `Conversation ${conversationId} deleted successfully` };
+  async deleteChatSession(sessionId: string) {
+    await this.chatSessionModel.findByIdAndDelete(sessionId).exec();
+    return { message: `Chat session ${sessionId} deleted successfully` };
   }
 }

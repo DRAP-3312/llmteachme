@@ -273,13 +273,13 @@ export class AdminController {
     return this.adminService.getSystemHealth();
   }
 
-  // ==================== Conversations Management ====================
+  // ==================== Chat Sessions Management ====================
 
-  @Get('conversations')
+  @Get('sessions')
   @ApiOperation({
-    summary: 'Get all conversations',
+    summary: 'Get all chat sessions',
     description:
-      'Retrieve all conversations with optional filtering and pagination',
+      'Retrieve all chat sessions with optional filtering and pagination',
   })
   @ApiQuery({
     name: 'userId',
@@ -306,17 +306,17 @@ export class AdminController {
   @ApiResponse({
     status: 200,
     description:
-      'Conversations retrieved successfully with pagination metadata',
+      'Chat sessions retrieved successfully with pagination metadata',
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })
-  async getAllConversations(
+  async getAllChatSessions(
     @Query('userId') userId?: string,
     @Query('isActive') isActive?: string,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
-    return this.adminService.getConversations({
+    return this.adminService.getChatSessions({
       userId,
       isActive:
         isActive === 'true' ? true : isActive === 'false' ? false : undefined,
@@ -325,38 +325,38 @@ export class AdminController {
     });
   }
 
-  @Get('conversations/:id')
+  @Get('sessions/:id')
   @ApiOperation({
-    summary: 'Get conversation details',
+    summary: 'Get chat session details',
     description:
-      'Retrieve detailed information about a specific conversation including all messages',
+      'Retrieve detailed information about a specific chat session including all messages',
   })
-  @ApiParam({ name: 'id', description: 'Conversation ID' })
+  @ApiParam({ name: 'id', description: 'Chat session ID' })
   @ApiResponse({
     status: 200,
-    description: 'Conversation details retrieved successfully',
+    description: 'Chat session details retrieved successfully',
   })
-  @ApiResponse({ status: 404, description: 'Conversation not found' })
+  @ApiResponse({ status: 404, description: 'Chat session not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })
-  async getConversation(@Param('id') id: string) {
-    return this.adminService.getConversationDetails(id);
+  async getChatSession(@Param('id') id: string) {
+    return this.adminService.getChatSessionDetails(id);
   }
 
-  @Delete('conversations/:id')
+  @Delete('sessions/:id')
   @ApiOperation({
-    summary: 'Delete conversation',
-    description: 'Permanently delete a conversation and all its messages',
+    summary: 'Delete chat session',
+    description: 'Permanently delete a chat session and all its messages',
   })
-  @ApiParam({ name: 'id', description: 'Conversation ID to delete' })
+  @ApiParam({ name: 'id', description: 'Chat session ID to delete' })
   @ApiResponse({
     status: 200,
-    description: 'Conversation deleted successfully',
+    description: 'Chat session deleted successfully',
   })
-  @ApiResponse({ status: 404, description: 'Conversation not found' })
+  @ApiResponse({ status: 404, description: 'Chat session not found' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden - Requires admin role' })
-  async deleteConversation(@Param('id') id: string) {
-    return this.adminService.deleteConversation(id);
+  async deleteChatSession(@Param('id') id: string) {
+    return this.adminService.deleteChatSession(id);
   }
 }
